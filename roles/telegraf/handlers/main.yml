@@ -1,0 +1,15 @@
+---
+# roles/telegraf/handlers/main.yml
+
+- name: Restart telegraf
+  ansible.builtin.systemd:
+    name: telegraf
+    state: restarted
+    daemon_reload: true
+  become: true
+
+- name: Reload telegraf
+  ansible.builtin.systemd:
+    name: telegraf
+    state: reloaded
+  become: true

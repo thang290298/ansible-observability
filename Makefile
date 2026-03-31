@@ -270,3 +270,22 @@ check-vault:
 
 pre-deploy: check-vault deps
 	@echo "✅ Pre-deploy checks passed — ready to deploy"
+
+## ─── Telegraf ───────────────────────────────────────────────────────────────
+telegraf: ## Deploy Telegraf trên tất cả nodes
+	$(ANSIBLE) -i $(INVENTORY) playbooks/exporters/telegraf.yml $(ARGS)
+
+telegraf-compute: ## Deploy Telegraf chỉ compute nodes
+	$(ANSIBLE) -i $(INVENTORY) playbooks/exporters/telegraf.yml --limit compute $(ARGS)
+
+telegraf-gpu: ## Deploy Telegraf chỉ compute GPU nodes
+	$(ANSIBLE) -i $(INVENTORY) playbooks/exporters/telegraf.yml --limit compute_gpu $(ARGS)
+
+telegraf-controller: ## Deploy Telegraf chỉ controller nodes
+	$(ANSIBLE) -i $(INVENTORY) playbooks/exporters/telegraf.yml --limit controller $(ARGS)
+
+telegraf-network: ## Deploy Telegraf chỉ network nodes
+	$(ANSIBLE) -i $(INVENTORY) playbooks/exporters/telegraf.yml --limit network $(ARGS)
+
+telegraf-ceph: ## Deploy Telegraf chỉ ceph nodes
+	$(ANSIBLE) -i $(INVENTORY) playbooks/exporters/telegraf.yml --limit ceph $(ARGS)

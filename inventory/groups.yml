@@ -55,6 +55,19 @@ all:
         # site_ntl3:   ← uncomment khi thêm site NTL3
 
     # --------------------------------------------------------------------------
+    # telegraf_nodes — Tất cả servers cần cài Telegraf
+    # Mỗi group có config riêng: compute/compute_gpu/controller/network/ceph
+    # --------------------------------------------------------------------------
+    telegraf_nodes:
+      children:
+        compute:
+        compute_gpu:
+        controller:
+        network:
+        ceph:
+        # Thêm group mới vào đây khi có server role mới
+
+    # --------------------------------------------------------------------------
     # promtail_nodes — Tất cả servers cần cài Promtail (log collector)
     # Dùng để: ./run.sh logging (phần promtail)
     # --------------------------------------------------------------------------

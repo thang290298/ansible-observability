@@ -1,0 +1,48 @@
+---
+# roles/telegraf/tasks/main.yml
+
+- name: "[telegraf] Hiển thị cấu hình"
+  ansible.builtin.debug:
+    msg: |
+      ══════════════════════════════════════════════════════
+      Deploying Telegraf {{ telegraf_version }}
+      Host       : {{ inventory_hostname }} ({{ ansible_host }})
+      Groups     : {{ group_names | join(', ') }}
+      Output     : {{ telegraf_vm_url }}
+      Libvirt    : {{ telegraf_enable_libvirt }}
+      GPU        : {{ telegraf_enable_gpu }}
+      RabbitMQ   : {{ telegraf_enable_rabbitmq }}
+      MySQL      : {{ telegraf_enable_mysql }}
+      Ceph       : {{ telegraf_enable_ceph }}
+      OVS        : {{ telegraf_enable_ovs }}
+      ══════════════════════════════════════════════════════
+
+- name: "[telegraf] Install"
+  ansible.builtin.include_tasks: install.yml
+  tags: [telegraf, install]
+
+- name: "[telegraf] Configure"
+  ansible.builtin.include_tasks: config.yml
+  tags: [telegraf, config]
+
+- name: "[telegraf] Enable & start service"
+  ansible.builtin.systemd:
+    name: telegraf
+    state: "{{ telegraf_service_state }}"
+    enabled: "{{ telegraf_service_enabled }}"
+    daemon_reload: true
+  become: true
+  tags: [telegraf]
+
+- name: "[telegraf] Verify telegraf running"
+  ansible.builtin.command: telegraf --test --config {{ telegraf_config_dir }}/telegraf.conf --config-directory {{ telegraf_config_d_dir }}
+  become: true
+  register: telegraf_test
+  changed_when: false
+  failed_when: telegraf_test.rc not in [0, 1]
+  tags: [telegraf, verify]
+
+- name: "[telegraf] ✅ Telegraf OK trên {{ inventory_hostname }}"
+  ansible.builtin.debug:
+    msg: "Telegraf {{ telegraf_version }} running — sending metrics to {{ telegraf_vm_url }}"
+  tags: [telegraf]

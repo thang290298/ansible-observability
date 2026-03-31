@@ -467,6 +467,24 @@ case "$ACTION" in
     openstack-exporter)
         run_playbook "exporters/openstack-exporter.yml" "Deploy OpenStack Exporter"
         ;;
+    telegraf)
+        run_playbook "exporters/telegraf.yml" "Deploy Telegraf (multi-config per group)"
+        ;;
+    telegraf-compute)
+        run_playbook "exporters/telegraf.yml" "Deploy Telegraf — compute nodes" "--limit compute"
+        ;;
+    telegraf-gpu)
+        run_playbook "exporters/telegraf.yml" "Deploy Telegraf — compute GPU nodes" "--limit compute_gpu"
+        ;;
+    telegraf-controller)
+        run_playbook "exporters/telegraf.yml" "Deploy Telegraf — controller nodes" "--limit controller"
+        ;;
+    telegraf-network)
+        run_playbook "exporters/telegraf.yml" "Deploy Telegraf — network nodes" "--limit network"
+        ;;
+    telegraf-ceph)
+        run_playbook "exporters/telegraf.yml" "Deploy Telegraf — ceph nodes" "--limit ceph"
+        ;;
     gen-config)
         run_playbook "exporters/gen-config.yml" \
             "Generate vmagent scrape configs từ inventory"

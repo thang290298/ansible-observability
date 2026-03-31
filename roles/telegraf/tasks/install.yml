@@ -1,0 +1,37 @@
+---
+# roles/telegraf/tasks/install.yml
+
+- name: "[telegraf] Thêm InfluxData APT key"
+  ansible.builtin.get_url:
+    url: "https://repos.influxdata.com/influxdata-archive_compat.key"
+    dest: /etc/apt/trusted.gpg.d/influxdata-archive_compat.asc
+    mode: '0644'
+  become: true
+
+- name: "[telegraf] Thêm InfluxData APT repo"
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.asc] https://repos.influxdata.com/ubuntu stable main"
+    filename: influxdata
+    state: present
+  become: true
+
+- name: "[telegraf] Install telegraf {{ telegraf_version }}"
+  ansible.builtin.apt:
+    name: "telegraf={{ telegraf_version }}-1"
+    state: present
+    update_cache: true
+  become: true
+  notify: Restart telegraf
+
+- name: "[telegraf] Tạo thư mục config.d"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: telegraf
+    group: telegraf
+  become: true
+  loop:
+    - "{{ telegraf_config_d_dir }}"
+    - "{{ telegraf_data_dir }}"
+    - "/var/log/telegraf"

@@ -1,0 +1,18 @@
+---
+# playbooks/exporters/telegraf.yml
+# Deploy Telegraf với config riêng cho từng group
+#
+# Usage:
+#   ./run.sh telegraf                    # Deploy tất cả
+#   ./run.sh telegraf --limit compute    # Chỉ compute nodes
+#   ./run.sh telegraf --limit ceph       # Chỉ ceph nodes
+#   ansible-playbook -i inventory/site-dbp4.yml playbooks/exporters/telegraf.yml
+
+- name: "[telegraf] Deploy Telegraf exporter — multi-config per group"
+  hosts: telegraf_nodes
+  become: true
+  gather_facts: true
+  serial: 10   # Deploy 10 nodes cùng lúc
+  tags: [telegraf]
+  roles:
+    - role: telegraf

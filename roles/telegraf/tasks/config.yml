@@ -1,0 +1,121 @@
+---
+# roles/telegraf/tasks/config.yml
+# Logic: Generate base config + input configs theo group của host
+
+- name: "[telegraf] Generate base config (agent + output)"
+  ansible.builtin.template:
+    src: telegraf.conf.j2
+    dest: "{{ telegraf_config_dir }}/telegraf.conf"
+    owner: telegraf
+    group: telegraf
+    mode: '0640'
+    backup: true
+  become: true
+  notify: Restart telegraf
+
+# ── Common inputs — mọi server đều có ──────────────────────────────────────
+- name: "[telegraf] Config: common metrics (CPU/RAM/disk/net/system)"
+  ansible.builtin.template:
+    src: inputs/common.conf.j2
+    dest: "{{ telegraf_config_d_dir }}/01-common.conf"
+    owner: telegraf
+    group: telegraf
+    mode: '0640'
+  become: true
+  notify: Restart telegraf
+
+# ── Compute inputs ─────────────────────────────────────────────────────────
+- name: "[telegraf] Config: compute metrics (libvirt, nova)"
+  ansible.builtin.template:
+    src: inputs/compute.conf.j2
+    dest: "{{ telegraf_config_d_dir }}/10-compute.conf"
+    owner: telegraf
+    group: telegraf
+    mode: '0640'
+  become: true
+  notify: Restart telegraf
+  when: inventory_hostname in groups.get('compute', []) + groups.get('compute_gpu', [])
+
+# ── Compute GPU inputs ─────────────────────────────────────────────────────
+- name: "[telegraf] Config: GPU metrics (NVIDIA SMI)"
+  ansible.builtin.template:
+    src: inputs/compute_gpu.conf.j2
+    dest: "{{ telegraf_config_d_dir }}/11-compute-gpu.conf"
+    owner: telegraf
+    group: telegraf
+    mode: '0640'
+  become: true
+  notify: Restart telegraf
+  when: inventory_hostname in groups.get('compute_gpu', [])
+
+# ── Controller inputs ──────────────────────────────────────────────────────
+- name: "[telegraf] Config: controller metrics (OpenStack API, RabbitMQ, MySQL)"
+  ansible.builtin.template:
+    src: inputs/controller.conf.j2
+    dest: "{{ telegraf_config_d_dir }}/20-controller.conf"
+    owner: telegraf
+    group: telegraf
+    mode: '0640'
+  become: true
+  notify: Restart telegraf
+  when: inventory_hostname in groups.get('controller', [])
+
+# ── Network inputs ─────────────────────────────────────────────────────────
+- name: "[telegraf] Config: network metrics (OVS, interface counters)"
+  ansible.builtin.template:
+    src: inputs/network.conf.j2
+    dest: "{{ telegraf_config_d_dir }}/30-network.conf"
+    owner: telegraf
+    group: telegraf
+    mode: '0640'
+  become: true
+  notify: Restart telegraf
+  when: inventory_hostname in groups.get('network', [])
+
+# ── Ceph inputs ────────────────────────────────────────────────────────────
+- name: "[telegraf] Config: ceph metrics (mon, osd, pool)"
+  ansible.builtin.template:
+    src: inputs/ceph.conf.j2
+    dest: "{{ telegraf_config_d_dir }}/40-ceph.conf"
+    owner: telegraf
+    group: telegraf
+    mode: '0640'
+  become: true
+  notify: Restart telegraf
+  when: inventory_hostname in groups.get('ceph', [])
+
+# ── Cleanup: xóa config không còn phù hợp với host ────────────────────────
+- name: "[telegraf] Remove compute config nếu host không thuộc compute group"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  become: true
+  notify: Restart telegraf
+  loop:
+    - "{{ telegraf_config_d_dir }}/10-compute.conf"
+    - "{{ telegraf_config_d_dir }}/11-compute-gpu.conf"
+  when: inventory_hostname not in groups.get('compute', []) + groups.get('compute_gpu', [])
+
+- name: "[telegraf] Remove controller config nếu host không thuộc controller group"
+  ansible.builtin.file:
+    path: "{{ telegraf_config_d_dir }}/20-controller.conf"
+    state: absent
+  become: true
+  notify: Restart telegraf
+  when: inventory_hostname not in groups.get('controller', [])
+
+- name: "[telegraf] Remove network config nếu host không thuộc network group"
+  ansible.builtin.file:
+    path: "{{ telegraf_config_d_dir }}/30-network.conf"
+    state: absent
+  become: true
+  notify: Restart telegraf
+  when: inventory_hostname not in groups.get('network', [])
+
+- name: "[telegraf] Remove ceph config nếu host không thuộc ceph group"
+  ansible.builtin.file:
+    path: "{{ telegraf_config_d_dir }}/40-ceph.conf"
+    state: absent
+  become: true
+  notify: Restart telegraf
+  when: inventory_hostname not in groups.get('ceph', [])

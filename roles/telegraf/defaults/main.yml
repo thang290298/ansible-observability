@@ -1,0 +1,46 @@
+---
+# roles/telegraf/defaults/main.yml
+
+# Version — latest stable (override để pin version cụ thể)
+telegraf_version: "1.33.0"
+
+# Agent settings
+telegraf_interval: "10s"
+telegraf_flush_interval: "10s"
+telegraf_hostname: "{{ inventory_hostname }}"
+
+# Output — VictoriaMetrics HTTP write endpoint (qua VIP)
+telegraf_vm_url: "http://{{ vip_address }}:8480/insert/0/influx/write"
+
+# Paths
+telegraf_config_dir: "/etc/telegraf"
+telegraf_config_d_dir: "/etc/telegraf/telegraf.d"
+telegraf_data_dir: "/var/lib/telegraf"
+telegraf_log_file: "/var/log/telegraf/telegraf.log"
+
+# Service
+telegraf_service_enabled: true
+telegraf_service_state: started
+
+# Feature flags — tự động detect theo group, override nếu cần
+telegraf_enable_libvirt: "{{ inventory_hostname in groups.get('compute', []) or inventory_hostname in groups.get('compute_gpu', []) }}"
+telegraf_enable_gpu: "{{ inventory_hostname in groups.get('compute_gpu', []) }}"
+telegraf_enable_rabbitmq: "{{ inventory_hostname in groups.get('controller', []) }}"
+telegraf_enable_mysql: "{{ inventory_hostname in groups.get('controller', []) }}"
+telegraf_enable_ceph: "{{ inventory_hostname in groups.get('ceph', []) }}"
+telegraf_enable_ovs: "{{ inventory_hostname in groups.get('network', []) }}"
+
+# RabbitMQ connection
+telegraf_rabbitmq_url: "http://localhost:15672"
+telegraf_rabbitmq_username: "guest"
+telegraf_rabbitmq_password: "{{ vault_rabbitmq_password | default('guest') }}"
+
+# MySQL connection
+telegraf_mysql_dsn: "{{ vault_mysql_telegraf_user | default('telegraf') }}:{{ vault_mysql_telegraf_password | default('') }}@tcp(localhost:3306)/"
+
+# Ceph
+telegraf_ceph_socket_dir: "/var/run/ceph"
+telegraf_ceph_socket_prefix: "ceph-"
+
+# NVIDIA GPU
+telegraf_nvidia_bin: "/usr/bin/nvidia-smi"
