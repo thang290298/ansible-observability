@@ -33,7 +33,11 @@ all:
         monitoring_loki:
         monitoring_gitea:
         monitoring_thanos_receive:
+        # ⚠️ Thanos chỉ active khi s3_enabled=true trong all/main.yml
+        # Khai báo hosts trong inventory/monitoring.yml
+        # monitoring_thanos_receive → Thanos Receive nodes
         monitoring_thanos_query:
+        # monitoring_thanos_query → Thanos Store + Query nodes
 
     # --------------------------------------------------------------------------
     # exporters — Tất cả servers cần cài node_exporter + exporter riêng

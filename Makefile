@@ -256,3 +256,17 @@ help:
 	@echo -e "  $(BOLD)Options:$(NC)"
 	@echo -e "  $(YELLOW)ANSIBLE_OPTS$(NC)  Truyền thêm args, vd: make deploy ANSIBLE_OPTS='--check -vv'"
 	@echo ""
+
+## ─── Security Checks ───────────────────────────────────────────────
+check-vault:
+	@echo "🔐 Checking vault security..."
+	@if grep -q "CHANGE_ME" .vault_pass 2>/dev/null; then \
+		echo "❌ .vault_pass chưa được cập nhật! Thay CHANGE_ME bằng password thật"; exit 1; \
+	fi
+	@if git ls-files --error-unmatch inventory/group_vars/all/vault.yml 2>/dev/null; then \
+		echo "❌ vault.yml đang bị track bởi git! Chạy: git rm --cached inventory/group_vars/all/vault.yml"; exit 1; \
+	fi
+	@echo "✅ Vault security OK"
+
+pre-deploy: check-vault deps
+	@echo "✅ Pre-deploy checks passed — ready to deploy"

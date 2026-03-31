@@ -12,6 +12,13 @@
 # dùng become_user (vd: postgres).
 # Khuyến nghị production: dùng user riêng có sudo thay vì root trực tiếp.
 # =============================================================================
+# ⚠️  PRODUCTION WARNING: Không dùng root trực tiếp trong môi trường production
+# Khuyến nghị: Tạo user riêng (vd: ansible) có sudo NOPASSWD, sau đó đổi về user đó
+# Ví dụ production:
+#   ansible_user: ansible
+#   ansible_become: true
+#   ansible_become_method: sudo
+#   ansible_ssh_private_key_file: ~/.ssh/ansible_key
 ansible_user: root
 ansible_become: true
 ansible_become_method: sudo
