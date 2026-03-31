@@ -116,27 +116,28 @@
   tags: [promtail, logs]
   roles: [promtail]
 
-- name: "[14] Verify toàn bộ hệ thống"
-  import_playbook: ops/verify.yml
-  tags: [verify]
-
-- name: "[15] Random Ping Monitoring — monitoring_lb"
+- name: "[14] Random Ping Monitoring — monitoring_lb"
   hosts: monitoring_lb
   become: true
   gather_facts: false
   tags: [random-ping]
   roles: [random_ping]
 
-- name: "[16] Thanos Receive — monitoring_thanos_receive"
+- name: "[15] Thanos Receive — monitoring_thanos_receive"
   hosts: monitoring_thanos_receive
   become: true
   gather_facts: false
   tags: [thanos, thanos-receive]
   roles: [thanos]
 
-- name: "[17] Thanos Store + Query — monitoring_thanos_query"
+- name: "[16] Thanos Store + Query — monitoring_thanos_query"
   hosts: monitoring_thanos_query
   become: true
   gather_facts: false
   tags: [thanos, thanos-query]
   roles: [thanos]
+
+# Verify sau cùng — bao gồm cả Thanos và Random Ping
+- name: "[17] Verify toàn bộ hệ thống"
+  import_playbook: ops/verify.yml
+  tags: [verify]

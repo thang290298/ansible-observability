@@ -19,7 +19,8 @@
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    mode: '0777'
+    mode: '0755'   # Fix: 0777 → 0755 (không cần world-writable)
+  become: true     # Fix: thêm become để tạo dir trong /opt/*
   loop:
     - "{{ monitoring_base_dir }}/loki"
     - "{{ loki_data_path }}"
@@ -37,6 +38,7 @@
     src: loki-config.yml.j2
     dest: "{{ monitoring_base_dir }}/loki/config.yml"
     backup: true
+  become: true
   notify: Restart loki
 
 - name: "[loki] Generate docker-compose"
@@ -44,17 +46,20 @@
     src: docker-compose.yml.j2
     dest: "{{ monitoring_base_dir }}/loki/docker-compose.yml"
     backup: true
+  become: true
   notify: Restart loki
 
 - name: "[loki] Pull Loki image"
   community.docker.docker_image:
     name: "grafana/loki:{{ loki_version }}"
     source: pull
+  become: true
 
 - name: "[loki] Start Loki"
   community.docker.docker_compose_v2:
     project_src: "{{ monitoring_base_dir }}/loki"
     state: present
+  become: true
 
 - name: "[loki] Chờ Loki sẵn sàng"
   ansible.builtin.uri:

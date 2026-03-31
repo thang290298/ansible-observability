@@ -11,3 +11,4 @@
     project_src: "{{ monitoring_base_dir }}/vmagent"
     state: present
     recreate: always
+  become: true

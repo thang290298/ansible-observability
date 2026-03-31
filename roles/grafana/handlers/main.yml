@@ -4,3 +4,4 @@
     project_src: "{{ monitoring_base_dir }}/grafana"
     state: present
     recreate: always
+  become: true

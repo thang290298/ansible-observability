@@ -1,9 +1,9 @@
 ---
 # roles/thanos/tasks/main.yml
 
-- name: "[thanos] Skip khi s3_enabled=false"
-  ansible.builtin.debug:
-    msg: "⏭️ Thanos skipped — s3_enabled=false"
+# ── Thanos chỉ chạy khi s3_enabled=true ────────────────────────────────────
+- name: "[thanos] Skip host nếu s3_enabled=false"
+  ansible.builtin.meta: end_host
   when: not (s3_enabled | default(false))
 
 - name: "[thanos] Tạo thư mục data"
@@ -11,28 +11,24 @@
     path: "{{ item }}"
     state: directory
     mode: "0755"
+  become: true
   loop:
     - "{{ monitoring_base_dir }}/thanos-receive"
     - "{{ monitoring_base_dir }}/thanos-store"
     - "{{ monitoring_base_dir }}/thanos-query"
     - "{{ thanos_receive_data_path }}"
     - "{{ thanos_store_data_path }}"
-  when: s3_enabled | default(false)
 
 - name: "[thanos] Deploy thanos-receive"
   ansible.builtin.include_tasks: receive.yml
-  when:
-    - s3_enabled | default(false)
-    - inventory_hostname in groups['monitoring_thanos_receive']
+  when: inventory_hostname in groups['monitoring_thanos_receive']
 
 - name: "[thanos] Deploy thanos-store"
   ansible.builtin.include_tasks: store.yml
-  when:
-    - s3_enabled | default(false)
-    - inventory_hostname in groups['monitoring_thanos_query']
+  # Fix: đổi từ monitoring_thanos_query → monitoring_thanos_receive
+  # (store chạy trên cùng node với receive, không phải query)
+  when: inventory_hostname in groups['monitoring_thanos_receive']
 
 - name: "[thanos] Deploy thanos-query"
   ansible.builtin.include_tasks: query.yml
-  when:
-    - s3_enabled | default(false)
-    - inventory_hostname in groups['monitoring_thanos_query']
+  when: inventory_hostname in groups['monitoring_thanos_query']
