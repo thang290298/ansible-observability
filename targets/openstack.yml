@@ -1,0 +1,20 @@
+# =============================================================================
+# targets/openstack.yml
+# OpenStack exporters: nova, neutron, cinder, keystone, glance...
+# =============================================================================
+
+groups:
+
+  - name: openstack-smartcloud2022
+    labels:
+      role: controller
+      site: HN4
+      env: production
+      cluster: smartcloud2022
+    hosts:
+      # openstack-exporter (port 9180) — tổng hợp tất cả services
+      - { host: 10.x.x.30, port: 9180, labels: { exporter: openstack } }
+      # cinder exporter
+      - { host: 10.x.x.30, port: 9313, labels: { exporter: cinder } }
+      # neutron exporter
+      - { host: 10.x.x.30, port: 9292, labels: { exporter: neutron } }

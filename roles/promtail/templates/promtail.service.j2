@@ -1,0 +1,26 @@
+[Unit]
+Description=Promtail — Log collection agent for Loki
+Documentation=https://grafana.com/docs/loki/latest/clients/promtail/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/promtail \
+    -config.file=/etc/promtail/config.yml \
+    -config.expand-env=true
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=promtail
+
+# Giới hạn tài nguyên
+LimitNOFILE=65536
+MemoryMax=512M
+CPUQuota=20%
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,35 @@
+version: "3.8"
+
+# =============================================================================
+# Alertmanager Cluster — Auto-scale từ inventory
+# Peers tự generate từ 2 monitoring nodes đầu tiên
+# Nodes: {{ groups['monitoring'][:2] | join(', ') }}
+# =============================================================================
+
+services:
+
+  alertmanager:
+    image: prom/alertmanager:{{ alertmanager_version }}
+    container_name: alertmanager
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/alertmanager/config.yml"
+      - "--storage.path=/alertmanager"
+      - "--web.listen-address=:{{ alertmanager_port }}"
+      # Cluster peers tự generate từ inventory
+{% for peer in alertmanager_peers %}
+{% if peer != ansible_host + ':' + alertmanager_cluster_port | string %}
+      - "--cluster.peer={{ peer }}"
+{% endif %}
+{% endfor %}
+      - "--cluster.listen-address=:{{ alertmanager_cluster_port }}"
+      - "--log.level=info"
+    volumes:
+      - ./config.yml:/etc/alertmanager/config.yml:ro
+      - {{ alertmanager_data_path }}:/alertmanager
+    ports:
+      - "{{ alertmanager_port }}:{{ alertmanager_port }}"
+      - "{{ alertmanager_cluster_port }}:{{ alertmanager_cluster_port }}"
+    labels:
+      monitoring: "true"
+      component: "alertmanager"

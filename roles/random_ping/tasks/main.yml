@@ -1,0 +1,70 @@
+---
+# roles/random_ping/tasks/main.yml
+- name: Create random ping directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /opt/monitoring/random-ping
+    - /etc/blackbox
+
+- name: Deploy node list config
+  template:
+    src: nodes.yml.j2
+    dest: /opt/monitoring/random-ping/nodes.yml
+    mode: '0644'
+  notify: restart random-ping
+
+- name: Deploy random ping script
+  template:
+    src: random-ping-targets.py.j2
+    dest: /opt/monitoring/random-ping/random-ping-targets.py
+    mode: '0755'
+  notify: restart random-ping
+
+# [FIX C1-task] Copy blackbox.yml config so container mount works
+- name: Copy blackbox exporter config
+  copy:
+    src: blackbox.yml
+    dest: /opt/monitoring/random-ping/blackbox.yml
+    mode: '0644'
+  notify: restart blackbox
+
+# [FIX C4] Deploy blackbox BEFORE starting systemd service
+- name: Deploy blackbox exporter docker-compose
+  template:
+    src: docker-compose-blackbox.yml.j2
+    dest: /opt/monitoring/random-ping/docker-compose.yml
+    mode: '0644'
+  notify: restart blackbox
+
+- name: Start blackbox exporter
+  community.docker.docker_compose_v2:
+    project_src: /opt/monitoring/random-ping
+    state: present
+
+- name: Install required python packages
+  pip:
+    name:
+      - pyyaml
+    state: present
+    executable: pip3
+  become: true
+
+- name: Deploy systemd service
+  template:
+    src: random-ping.service.j2
+    dest: /etc/systemd/system/random-ping-targets.service
+    mode: '0644'
+  notify:
+    - reload systemd
+    - restart random-ping
+
+# [FIX C4] Enable/start service AFTER blackbox is running
+- name: Enable and start random-ping service
+  systemd:
+    name: random-ping-targets
+    enabled: true
+    state: started
+    daemon_reload: true

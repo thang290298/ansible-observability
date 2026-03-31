@@ -1,0 +1,10 @@
+---
+# playbooks/04-haproxy.yml
+- name: "⚖️  [04/12] Cài đặt HAProxy (Load Balancer)"
+  hosts: monitoring_lb
+  become: true
+  gather_facts: false
+  tags: [haproxy, lb, network]
+  roles:
+    - role: haproxy
+      tags: haproxy

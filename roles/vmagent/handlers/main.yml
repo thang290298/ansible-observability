@@ -1,0 +1,13 @@
+---
+- name: Reload vmagent
+  uri:
+    url: "http://localhost:{{ vmagent_port }}/-/reload"
+    method: GET
+    status_code: 200
+  ignore_errors: true
+
+- name: Restart vmagent
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/vmagent"
+    state: present
+    recreate: always

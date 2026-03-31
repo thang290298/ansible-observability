@@ -1,0 +1,6 @@
+---
+- name: Restart gitea
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/gitea"
+    state: present
+    recreate: always

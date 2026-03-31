@@ -1,0 +1,106 @@
+---
+# roles/node_exporter/tasks/main.yml
+
+# [FIX M2] Tạo user system riêng cho node_exporter (không chạy root)
+- name: "[node_exporter] Tạo user node_exporter"
+  user:
+    name: node_exporter
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+    comment: "Prometheus Node Exporter"
+  become: true
+  tags: [node_exporter]
+
+- name: "[node_exporter] Tạo thư mục textfile_collector"
+  file:
+    path: "{{ node_exporter_data_path }}"
+    state: directory
+    mode: '0755'
+    owner: node_exporter
+    group: node_exporter
+  become: true
+  tags: [node_exporter]
+
+- name: "[node_exporter] Download binary"
+  get_url:
+    url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/node_exporter.tar.gz"
+    mode: '0644'
+  register: ne_downloaded
+  tags: [node_exporter]
+
+- name: "[node_exporter] Extract"
+  unarchive:
+    src: /tmp/node_exporter.tar.gz
+    dest: /tmp/
+    remote_src: true
+  when: ne_downloaded.changed
+  tags: [node_exporter]
+
+- name: "[node_exporter] Install binary"
+  copy:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+    dest: /usr/local/bin/node_exporter
+    mode: '0755'
+    owner: root
+    group: root
+    remote_src: true
+  when: ne_downloaded.changed
+  become: true
+  notify: Restart node_exporter
+  tags: [node_exporter]
+
+- name: "[node_exporter] Create systemd service"
+  copy:
+    dest: /etc/systemd/system/node_exporter.service
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Prometheus Node Exporter
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User=node_exporter
+      Group=node_exporter
+      ExecStart=/usr/local/bin/node_exporter \
+          --web.listen-address=:{{ node_exporter_port }} \
+          --collector.textfile.directory={{ node_exporter_data_path }} \
+          --collector.systemd \
+          --collector.processes \
+          --no-collector.mdadm
+      Restart=on-failure
+      RestartSec=5s
+      LimitNOFILE=65536
+      MemoryMax=256M
+      NoNewPrivileges=true
+      ProtectSystem=strict
+      ProtectHome=read-only
+      ReadWritePaths={{ node_exporter_data_path }}
+
+      [Install]
+      WantedBy=multi-user.target
+  become: true
+  notify:
+    - Reload systemd
+    - Restart node_exporter
+  tags: [node_exporter]
+
+- name: "[node_exporter] Enable + Start"
+  systemd:
+    name: node_exporter
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+  tags: [node_exporter]
+
+- name: "[node_exporter] Verify"
+  uri:
+    url: "http://localhost:{{ node_exporter_port }}/metrics"
+    status_code: 200
+  retries: 5
+  delay: 3
+  tags: [node_exporter, verify]

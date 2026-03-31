@@ -1,0 +1,8 @@
+inventory/group_vars/vault.yml
+.vault_pass
+*.retry
+logs/
+*.log
+__pycache__/
+*.pyc
+.env

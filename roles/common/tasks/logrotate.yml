@@ -1,0 +1,33 @@
+---
+# roles/common/tasks/main.yml (bổ sung log rotation cho Promtail positions)
+
+- name: "[common] Cấu hình logrotate cho Promtail positions"
+  copy:
+    dest: /etc/logrotate.d/promtail
+    content: |
+      /var/lib/promtail/positions.yaml {
+          daily
+          rotate 7
+          compress
+          missingok
+          notifempty
+          create 0644 root root
+      }
+    mode: '0644'
+
+- name: "[common] Cấu hình Docker log rotation mặc định"
+  copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "100m",
+          "max-file": "3"
+        },
+        "live-restore": true,
+        "metrics-addr": "0.0.0.0:9323",
+        "experimental": true
+      }
+    mode: '0644'
+  notify: Restart docker

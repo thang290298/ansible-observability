@@ -1,0 +1,5 @@
+---
+# inventory/group_vars/monitoring_vmagent.yml
+# Biến riêng cho vmagent nodes
+
+vmagent_node_count: "{{ groups['monitoring_vmagent'] | length }}"

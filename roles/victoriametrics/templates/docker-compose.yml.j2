@@ -1,0 +1,77 @@
+version: "3.8"
+
+# =============================================================================
+# VictoriaMetrics Cluster — Auto-scale từ inventory
+# Thêm node vào monitoring group → vmstorage tự mở rộng
+# Storage nodes: {{ groups['monitoring'] | length }} nodes
+# =============================================================================
+
+services:
+
+  vmstorage:
+    image: victoriametrics/vmstorage:{{ victoriametrics_version }}
+    container_name: vmstorage
+    restart: unless-stopped
+    command:
+      - "--storageDataPath=/vmstorage-data"
+      - "--retentionPeriod={{ vm_retention_period }}"
+      - "--httpListenAddr=:{{ vmstorage_port }}"
+      - "--vminsertAddr=:{{ vmstorage_vminsert_port }}"
+      - "--vmselectAddr=:{{ vmstorage_vmselect_port }}"
+      - "--loggerLevel=INFO"
+    volumes:
+      - {{ vm_storage_data_path }}:/vmstorage-data
+    ports:
+      - "{{ vmstorage_port }}:{{ vmstorage_port }}"
+      - "{{ vmstorage_vminsert_port }}:{{ vmstorage_vminsert_port }}"
+      - "{{ vmstorage_vmselect_port }}:{{ vmstorage_vmselect_port }}"
+    labels:
+      monitoring: "true"
+      component: "vmstorage"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  vminsert:
+    image: victoriametrics/vminsert:{{ victoriametrics_version }}
+    container_name: vminsert
+    restart: unless-stopped
+    # storageNode tự generate từ tất cả monitoring nodes
+    command:
+      - "--storageNode={{ vmstorage_nodes | join(',') }}"
+      - "--replicationFactor={{ vm_replication_factor }}"
+      - "--httpListenAddr=:{{ vminsert_port }}"
+      - "--loggerLevel=INFO"
+    ports:
+      - "{{ vminsert_port }}:{{ vminsert_port }}"
+    labels:
+      monitoring: "true"
+      component: "vminsert"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  vmselect:
+    image: victoriametrics/vmselect:{{ victoriametrics_version }}
+    container_name: vmselect
+    restart: unless-stopped
+    # storageNode tự generate từ tất cả monitoring nodes
+    command:
+      - "--storageNode={{ vmstorage_select_nodes | join(',') }}"
+      - "--deduplicateMinScrapeInterval={{ vmagent_scrape_interval }}"
+      - "--httpListenAddr=:{{ vmselect_port }}"
+      - "--loggerLevel=INFO"
+    ports:
+      - "{{ vmselect_port }}:{{ vmselect_port }}"
+    labels:
+      monitoring: "true"
+      component: "vmselect"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"

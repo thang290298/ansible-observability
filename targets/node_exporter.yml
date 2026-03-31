@@ -1,0 +1,74 @@
+# =============================================================================
+# targets/node_exporter.yml
+# Danh sách tất cả client cần scrape node_exporter
+# =============================================================================
+# Cách thêm client mới:
+#   1. Thêm vào đúng group bên dưới
+#   2. Chạy: ./run.sh reconfig --tags targets
+#   3. vmagent tự reload — scrape ngay, không cần restart
+#
+# Format mỗi entry:
+#   - host: <IP hoặc hostname>
+#     port: 9100           # mặc định 9100, ghi đè nếu khác
+#     labels:              # labels tùy chỉnh để filter trong Grafana
+#       site: HN4
+#       cluster: tên-cluster
+#       role: compute|storage|controller|monitoring|...
+#       env: production|staging
+# =============================================================================
+
+groups:
+
+  # ── Monitoring nodes ──
+  - name: monitoring-nodes
+    labels:
+      role: monitoring
+      env: production
+    hosts:
+      - { host: 10.x.x.1, labels: { site: HN4, cluster: monitoring } }
+      - { host: 10.x.x.2, labels: { site: HN4, cluster: monitoring } }
+      - { host: 10.x.x.3, labels: { site: HN4, cluster: monitoring } }
+
+  # ── Compute nodes ──
+  - name: compute-hn4
+    labels:
+      role: compute
+      site: HN4
+      env: production
+    hosts:
+      - { host: 10.x.x.20, labels: { cluster: smartcloud2022 } }
+      - { host: 10.x.x.21, labels: { cluster: smartcloud2022 } }
+      - { host: 10.x.x.22, labels: { cluster: smartcloud2022 } }
+      # Thêm compute node mới ở đây:
+      # - { host: 10.x.x.23, labels: { cluster: smartcloud2022 } }
+
+  # ── Controller nodes ──
+  - name: controller-hn4
+    labels:
+      role: controller
+      site: HN4
+      env: production
+    hosts:
+      - { host: 10.x.x.30, labels: { cluster: smartcloud2022 } }
+      - { host: 10.x.x.31, labels: { cluster: smartcloud2022 } }
+      - { host: 10.x.x.32, labels: { cluster: smartcloud2022 } }
+
+  # ── Storage / Ceph nodes ──
+  - name: ceph-dbp3
+    labels:
+      role: ceph-osd
+      site: DBP
+      env: production
+    hosts:
+      - { host: 10.x.x.10, labels: { cluster: ceph-dbp3 } }
+      - { host: 10.x.x.11, labels: { cluster: ceph-dbp3 } }
+      - { host: 10.x.x.12, labels: { cluster: ceph-dbp3 } }
+
+  # ── Network devices (nếu có node_exporter trên switch/router) ──
+  - name: network
+    labels:
+      role: network
+      site: HN4
+      env: production
+    hosts: []
+      # - { host: 10.x.x.200, port: 9100, labels: { cluster: core-switch } }

@@ -1,0 +1,8 @@
+---
+# inventory/group_vars/exporters.yml
+# Biến dùng chung cho tất cả exporter nodes
+
+node_exporter_port: 9100
+node_exporter_extra_collectors:
+  - systemd
+  - processes

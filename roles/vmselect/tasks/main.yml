@@ -1,0 +1,27 @@
+---
+# roles/vmselect/tasks/main.yml
+- name: "[vmselect] Tạo thư mục"
+  file:
+    path: "{{ monitoring_base_dir }}/vmselect"
+    state: directory
+    mode: '0755'
+
+- name: "[vmselect] Generate docker-compose"
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitoring_base_dir }}/vmselect/docker-compose.yml"
+    backup: true
+  notify: Restart vmselect
+
+- name: "[vmselect] Start vmselect"
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/vmselect"
+    state: present
+
+- name: "[vmselect] Health check"
+  uri:
+    url: "http://localhost:{{ vmselect_port }}/health"
+    status_code: 200
+  retries: 10
+  delay: 3
+  tags: [vmselect, verify]

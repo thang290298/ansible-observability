@@ -1,0 +1,40 @@
+---
+# playbooks/reconfig-alertmanager.yml
+# Cập nhật Alertmanager routing config (Telegram, email, pagerduty...)
+- name: "🔔 [RECONFIG] Cập nhật Alertmanager routing"
+  hosts: monitoring_alertmanager
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [reconfig, alertmanager]
+
+  tasks:
+    - name: "[alertmanager] Generate alertmanager config"
+      template:
+        src: "{{ playbook_dir }}/../roles/alertmanager/templates/alertmanager.yml.j2"
+        dest: "{{ alertmanager_data_path | default('/data/alertmanager') }}/../alertmanager/alertmanager.yml"
+        backup: true
+      notify: Reload alertmanager
+
+    - name: "[alertmanager] Verify config"
+      command: >
+        docker run --rm
+        -v {{ alertmanager_data_path | default('/data/alertmanager') }}/../alertmanager/alertmanager.yml:/alertmanager.yml
+        prom/alertmanager:{{ alertmanager_version }}
+        --config.file=/alertmanager.yml
+        --check-config
+      register: am_check
+      changed_when: false
+      ignore_errors: true
+
+    - name: "[alertmanager] Reload via API"
+      uri:
+        url: "http://localhost:{{ alertmanager_port }}/-/reload"
+        method: POST
+        status_code: [200, 204]
+      ignore_errors: true
+
+  handlers:
+    - name: Reload alertmanager
+      shell: docker kill --signal=SIGHUP alertmanager
+      ignore_errors: true

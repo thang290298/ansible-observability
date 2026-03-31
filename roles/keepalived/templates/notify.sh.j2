@@ -1,0 +1,25 @@
+#!/bin/bash
+# /etc/keepalived/notify.sh
+# Gửi Telegram khi VIP chuyển node
+
+STATE=$1
+VIP=$2
+HOSTNAME=$(hostname)
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+BOT_TOKEN="{{ telegram_bot_token }}"
+CHAT_ID="{{ telegram_chat_id }}"
+
+case "$STATE" in
+    MASTER)
+        MSG="✅ Keepalived MASTER: VIP ${VIP} đã chuyển sang ${HOSTNAME} lúc ${TIMESTAMP}"
+        ;;
+    BACKUP)
+        MSG="⚠️ Keepalived BACKUP: ${HOSTNAME} chuyển sang BACKUP lúc ${TIMESTAMP}"
+        ;;
+    FAULT)
+        MSG="❌ Keepalived FAULT: ${HOSTNAME} gặp sự cố lúc ${TIMESTAMP}"
+        ;;
+esac
+
+curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+    -d "chat_id=${CHAT_ID}&text=${MSG}" > /dev/null 2>&1

@@ -1,0 +1,28 @@
+# =============================================================================
+# targets/ceph.yml
+# Danh sách Ceph clusters cần scrape
+# Port mặc định: 9283 (ceph-exporter) hoặc 9128 (ceph_mgr prometheus module)
+# =============================================================================
+
+groups:
+
+  - name: ceph-dbp3
+    labels:
+      role: ceph
+      site: DBP
+      env: production
+      cluster: ceph-dbp3
+    hosts:
+      - { host: 10.x.x.10, port: 9283 }
+      - { host: 10.x.x.11, port: 9283 }
+      - { host: 10.x.x.12, port: 9283 }
+
+  # ── Thêm ceph cluster mới ──
+  # - name: ceph-hn4
+  #   labels:
+  #     role: ceph
+  #     site: HN4
+  #     env: production
+  #     cluster: ceph-hn4
+  #   hosts:
+  #     - { host: 10.x.x.40, port: 9283 }

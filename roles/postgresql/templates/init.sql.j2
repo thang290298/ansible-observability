@@ -1,0 +1,12 @@
+-- PostgreSQL init script
+-- Tạo users và databases cho Grafana và Gitea
+
+-- ── Grafana ──────────────────────────────────────────────────────────────────
+CREATE USER {{ grafana_db_user }} WITH PASSWORD '{{ grafana_db_password }}';
+CREATE DATABASE {{ grafana_db_name }} OWNER {{ grafana_db_user }};
+GRANT ALL PRIVILEGES ON DATABASE {{ grafana_db_name }} TO {{ grafana_db_user }};
+
+-- ── Gitea ─────────────────────────────────────────────────────────────────────
+CREATE USER gitea WITH PASSWORD '{{ gitea_db_password }}';
+CREATE DATABASE gitea OWNER gitea;
+GRANT ALL PRIVILEGES ON DATABASE gitea TO gitea;

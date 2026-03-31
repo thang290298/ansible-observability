@@ -1,0 +1,138 @@
+---
+# roles/common/tasks/main.yml
+
+- name: "[common] Cập nhật package cache"
+  apt:
+    update_cache: true
+    cache_valid_time: 3600
+  when: ansible_os_family == "Debian"
+  tags: [common, packages]
+
+- name: "[common] Cài các package cần thiết"
+  package:
+    name:
+      - curl
+      - wget
+      - vim
+      - htop
+      - net-tools
+      - chrony
+      - python3
+      - python3-pip
+      - rsync
+      - lsof
+    state: present
+  tags: [common, packages]
+
+- name: "[common] Cấu hình NTP"
+  template:
+    src: chrony.conf.j2
+    dest: /etc/chrony.conf
+  notify: Restart chrony
+  tags: [common, ntp]
+
+- name: "[common] Enable và start chronyd"
+  service:
+    name: chronyd
+    state: started
+    enabled: true
+  tags: [common, ntp]
+
+- name: "[common] Cấu hình timezone"
+  timezone:
+    name: Asia/Ho_Chi_Minh
+  tags: [common, timezone]
+
+# [FIX H5] firewalld chỉ chạy trên RedHat/CentOS — Ubuntu dùng ufw
+- name: "[common] Cấu hình firewalld (RedHat/CentOS only)"
+  firewalld:
+    port: "{{ item }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - "22"
+    - "80"
+    - "3000"       # Grafana
+    - "8480"       # vminsert
+    - "8481"       # vmselect
+    - "8482"       # vmstorage
+    - "8400"       # vmstorage vminsert
+    - "8401"       # vmstorage vmselect
+    - "8404"       # HAProxy stats
+    - "8429"       # vmagent
+    - "9093"       # Alertmanager
+    - "9094"       # Alertmanager cluster
+    - "9100"       # node_exporter
+    - "3001"       # Gitea
+    - "9000"       # Ansible runner
+    - "9115"       # Blackbox exporter
+    - "3100"       # Loki
+    - "9080"       # Promtail
+  when: ansible_os_family == "RedHat"
+  ignore_errors: true
+  tags: [common, firewall]
+
+# [FIX H5] UFW rules cho Ubuntu/Debian
+- name: "[common] Cài ufw (Debian/Ubuntu)"
+  apt:
+    name: ufw
+    state: present
+  when: ansible_os_family == "Debian"
+  tags: [common, firewall]
+
+- name: "[common] Cấu hình ufw — cho phép monitoring ports (Debian/Ubuntu)"
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - "22"
+    - "80"
+    - "3000"
+    - "8480"
+    - "8481"
+    - "8482"
+    - "8400"
+    - "8401"
+    - "8404"
+    - "8429"
+    - "9093"
+    - "9094"
+    - "9100"
+    - "3001"
+    - "9000"
+    - "9115"
+    - "3100"
+    - "9080"
+  when: ansible_os_family == "Debian"
+  ignore_errors: true
+  tags: [common, firewall]
+
+- name: "[common] Enable ufw"
+  ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+  when: ansible_os_family == "Debian"
+  ignore_errors: true
+  tags: [common, firewall]
+
+- name: "[common] Tạo thư mục cấu trúc monitoring"
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ monitoring_base_dir }}"
+    - "{{ monitoring_base_dir }}/vmagent"
+    - "{{ monitoring_base_dir }}/vmalert"
+    - "{{ monitoring_base_dir }}/vmalert/rules"
+    - "{{ data_base_dir }}/vmstorage"
+    - "{{ data_base_dir }}/grafana"
+    - "{{ data_base_dir }}/postgres"
+    - "{{ data_base_dir }}/alertmanager"
+    - "{{ data_base_dir }}/vmagent"
+    - "/backup/monitoring"
+  become: true
+  tags: [common, directories]

@@ -1,0 +1,132 @@
+---
+# playbooks/site.yml
+# Deploy đúng service lên đúng group — không thừa, không thiếu
+
+- name: "📦 [01] OS cơ bản — tất cả nodes"
+  hosts: all
+  become: true
+  gather_facts: true
+  tags: [common]
+  roles: [common]
+
+- name: "📊 [02] node_exporter — tất cả exporters"
+  hosts: exporters
+  become: true
+  gather_facts: false
+  tags: [node_exporter]
+  roles: [node_exporter]
+
+- name: "🐳 [03] Docker — tất cả monitoring nodes"
+  hosts: monitoring
+  become: true
+  gather_facts: true   # [FIX L4] Docker role needs ansible_distribution_release
+  tags: [docker]
+  roles: [docker]
+
+- name: "🔀 [04] Keepalived + HAProxy — monitoring_lb"
+  hosts: monitoring_lb
+  become: true
+  gather_facts: false
+  tags: [keepalived, haproxy, lb]
+  roles: [keepalived, haproxy]
+
+- name: "💾 [05] vmstorage — monitoring_storage"
+  hosts: monitoring_storage
+  become: true
+  gather_facts: false
+  serial: 1                 # Rolling: 1 node tại 1 thời điểm
+  tags: [vmstorage, vm]
+
+  pre_tasks:
+    - name: "[vmstorage] Verify cluster healthy trước khi proceed"
+      uri:
+        url: "http://{{ ansible_host }}:{{ vmstorage_port }}/health"
+        status_code: 200
+      retries: 3
+      delay: 5
+      ignore_errors: true   # Lần đầu deploy chưa có service
+
+  roles: [vmstorage]
+
+- name: "🔄 [06] vminsert + vmselect — monitoring_query"
+  hosts: monitoring_query
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [vmquery, vm]
+
+  pre_tasks:
+    - name: "[vmquery] Chờ vmstorage cluster ổn định"
+      uri:
+        url: "http://{{ hostvars[item]['ansible_host'] }}:{{ vmstorage_port }}/health"
+        status_code: 200
+      loop: "{{ groups['monitoring_storage'] }}"
+      retries: 12
+      delay: 5
+      run_once: true   # chỉ check 1 lần, không lặp per-host
+
+  roles: [vminsert, vmselect]
+
+- name: "🗄️  [07] PostgreSQL — monitoring_db"
+  hosts: monitoring_db
+  become: true
+  gather_facts: false
+  tags: [postgresql, db]
+  roles: [postgresql]
+
+- name: "📊 [08] Grafana — monitoring_grafana"
+  hosts: monitoring_grafana
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [grafana]
+  roles: [grafana]
+
+- name: "🔔 [09] Alertmanager — monitoring_alertmanager"
+  hosts: monitoring_alertmanager
+  become: true
+  gather_facts: false
+  serial: 1                 # Gossip cần node trước ổn định trước khi node sau join
+  tags: [alertmanager]
+  roles: [alertmanager]
+
+- name: "🔍 [10] vmagent — monitoring_vmagent"
+  hosts: monitoring_vmagent
+  become: true
+  gather_facts: false
+  tags: [vmagent]
+  roles: [vmagent]
+
+- name: "🦊 [11] Gitea + Ansible Runner — monitoring_gitea"
+  hosts: monitoring_gitea
+  become: true
+  gather_facts: false
+  tags: [gitea]
+  roles: [gitea]
+
+- name: "📋 [12] Loki Log Cluster — monitoring_loki"
+  hosts: monitoring_loki
+  become: true
+  gather_facts: false
+  serial: 1                 # Memberlist ring cần ổn định từng node
+  tags: [loki, logs]
+  roles: [loki]
+
+- name: "🪵 [13] Promtail — tất cả servers"
+  hosts: promtail_nodes
+  become: true
+  gather_facts: false
+  tags: [promtail, logs]
+  roles: [promtail]
+
+- name: "✅ [14] Verify"
+  import_playbook: verify.yml
+  tags: [verify]
+
+# Random Ping Monitoring
+- name: Deploy Random Ping Monitoring
+  hosts: monitoring_lb
+  become: true
+  roles:
+    - role: random_ping
+  tags: [random-ping]

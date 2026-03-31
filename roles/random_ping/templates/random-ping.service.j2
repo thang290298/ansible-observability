@@ -1,0 +1,14 @@
+[Unit]
+Description=Random Ping Target Rotator
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/monitoring/random-ping/random-ping-targets.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

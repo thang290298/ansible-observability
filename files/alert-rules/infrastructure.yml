@@ -1,0 +1,127 @@
+groups:
+  - name: victoriametrics.rules
+    rules:
+      - alert: VmstorageDown
+        expr: up{job="victoriametrics", component="vmstorage"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "vmstorage DOWN trên {{ $labels.instance }}"
+          description: "vmstorage không phản hồi. Dữ liệu đang bị mất nếu < 2 nodes còn sống."
+
+      - alert: VminsertDown
+        expr: up{job="victoriametrics", component="vminsert"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "vminsert DOWN trên {{ $labels.instance }}"
+          description: "vminsert không nhận metrics. Scrape bị mất."
+
+      - alert: VmselectDown
+        expr: up{job="victoriametrics", component="vmselect"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "vmselect DOWN trên {{ $labels.instance }}"
+          description: "vmselect không phản hồi. Grafana có thể bị ảnh hưởng."
+
+      - alert: VmstorageHighDiskUsage
+        expr: vm_data_size_bytes / vm_free_disk_space_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "vmstorage disk usage cao trên {{ $labels.instance }}"
+          description: "Data/Free ratio = {{ $value | humanize }}. Cần thêm node storage hoặc giảm retention."
+
+      - alert: VminsertQueueFull
+        expr: vm_rows_added_to_storage_total{type="slow"} > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "vminsert slow ingestion trên {{ $labels.instance }}"
+          description: "Có rows bị insert chậm. Có thể cần scale vminsert hoặc vmstorage."
+
+  - name: vmagent.rules
+    rules:
+      - alert: VmagentDown
+        expr: up{job="vmagent"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "vmagent DOWN trên {{ $labels.instance }}"
+          description: "vmagent không scrape metrics. Nếu tất cả vmagent đều down, metrics sẽ bị gap."
+
+      - alert: VmagentScrapeFailed
+        expr: sum by(job, instance) (vmagent_scrape_target_scrapes_failed_total) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "vmagent scrape failures trên {{ $labels.instance }}"
+          description: "{{ $value }} scrape failures trong 10 phút. Kiểm tra targets."
+
+  - name: loki.rules
+    rules:
+      - alert: LokiDown
+        expr: up{job="loki"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Loki DOWN trên {{ $labels.instance }}"
+          description: "Loki không phản hồi. Logs có thể bị mất."
+
+      - alert: PromtailDown
+        expr: up{job="promtail"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Promtail DOWN trên {{ $labels.instance }}"
+          description: "Promtail trên {{ $labels.instance }} không gửi logs. Logs từ server này bị mất."
+
+  - name: haproxy.rules
+    rules:
+      - alert: HaproxyDown
+        expr: up{job="haproxy"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HAProxy DOWN trên {{ $labels.instance }}"
+          description: "HAProxy không phản hồi. VIP có thể bị ảnh hưởng."
+
+      - alert: HaproxyBackendDown
+        expr: haproxy_backend_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "HAProxy backend {{ $labels.backend }} DOWN"
+          description: "Backend {{ $labels.backend }} trên {{ $labels.instance }} không còn backend nào healthy."
+
+  - name: alertmanager.rules
+    rules:
+      - alert: AlertmanagerDown
+        expr: up{job="alertmanager"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Alertmanager DOWN trên {{ $labels.instance }}"
+          description: "Alertmanager không phản hồi. Không có alert nào được gửi đi."
+
+      - alert: AlertmanagerClusterSplit
+        expr: alertmanager_cluster_peers_joined_total < 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alertmanager cluster split"
+          description: "Chỉ còn {{ $value }} peers trong cluster. Có thể có split-brain."

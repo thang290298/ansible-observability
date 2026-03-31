@@ -1,0 +1,164 @@
+auth_enabled: false
+
+server:
+  http_listen_port: {{ loki_port }}
+  grpc_listen_port: {{ loki_grpc_port }}
+  log_level: info
+
+common:
+  path_prefix: /loki
+  replication_factor: {{ loki_replication_factor }}
+  ring:
+    kvstore:
+      store: memberlist
+
+# =============================================================================
+# Memberlist — peer discovery
+# =============================================================================
+memberlist:
+  join_members:
+{% for host in groups['monitoring_loki'] %}
+    - {{ hostvars[host]['ansible_host'] }}:{{ loki_memberlist_port }}
+{% endfor %}
+  bind_port: {{ loki_memberlist_port }}
+  dead_node_reclaim_time: 30s
+
+# =============================================================================
+# Ingester — nhận và buffer logs
+# WAL ghi local trước (tránh mất data nếu crash trước khi flush ra S3)
+# =============================================================================
+ingester:
+  wal:
+    enabled: true
+    dir: /loki/wal           # ← local filesystem, fast write
+    flush_on_shutdown: true
+    checkpoint_duration: 5m
+  lifecycler:
+    ring:
+      kvstore:
+        store: memberlist
+      replication_factor: {{ loki_replication_factor }}
+    final_sleep: 0s
+  chunk_idle_period: 1h
+  max_chunk_age: 2h
+  chunk_target_size: 1536000
+  chunk_retain_period: 30s
+
+# =============================================================================
+# Schema config
+# =============================================================================
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: s3
+      schema: v13
+      index:
+        prefix: loki_index_
+        period: 24h
+
+# =============================================================================
+# Storage config — Hybrid: filesystem cache + S3 (MinIO) persistent
+#
+# Luồng dữ liệu:
+#   Promtail → Ingester (WAL local) → flush → MinIO (S3)
+#   Query    → cache (filesystem)   → miss  → MinIO (S3)
+#
+# Filesystem roles:
+#   /loki/wal      : WAL buffer — tránh mất data khi crash
+#   /loki/index    : TSDB index cache — tăng tốc query
+#   /loki/chunks-cache : chunk cache — tránh đọc S3 lặp lại
+#
+# S3/MinIO role:
+#   Persistent storage cho tất cả chunks và index
+#   Dữ liệu nhất quán giữa tất cả Loki nodes
+# =============================================================================
+storage_config:
+  tsdb_shipper:
+    active_index_directory: /loki/index
+    cache_location: /loki/index/cache
+    cache_ttl: 24h
+    shared_store: s3
+  aws:
+    endpoint: "{{ vip_address }}:{{ minio_api_port }}"
+    bucketnames: "{{ loki_minio_bucket }}"
+    access_key_id: "{{ minio_root_user }}"
+    secret_access_key: "{{ minio_root_password }}"
+    insecure: true
+    s3forcepathstyle: true
+    region: us-east-1
+
+# Fix #1 — chunk_store_config là top-level key, KHÔNG phải con của storage_config
+# Fix #8 — tách credentials ra khỏi URL
+chunk_store_config:
+  chunk_cache_config:
+    embedded_cache:
+      enabled: true
+      max_size_mb: {{ loki_chunk_cache_mb | default(512) }}
+      ttl: 1h
+
+# =============================================================================
+# Compactor — chạy trên 1 node (dùng ring để election)
+# Đọc từ S3, compact, ghi lại S3
+# Index cache local tự invalidate sau compaction
+# =============================================================================
+compactor:
+  working_directory: /loki/compactor     # local temp dir trong quá trình compact
+  shared_store: s3
+  delete_request_store: s3
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
+  compaction_interval: 10m
+
+# =============================================================================
+# Limits
+# =============================================================================
+limits_config:
+  retention_period: {{ loki_retention_period }}
+  ingestion_rate_mb: 16
+  ingestion_burst_size_mb: 32
+  max_query_series: 100000
+  max_query_lookback: {{ loki_retention_period }}
+  max_streams_per_user: 10000
+  max_label_names_per_series: 30
+  split_queries_by_interval: 24h
+  per_stream_rate_limit: 3MB
+  per_stream_rate_limit_burst: 10MB
+
+# =============================================================================
+# Query range — cache results trên filesystem local
+# =============================================================================
+query_range:
+  align_queries_with_step: true
+  cache_results: true
+  results_cache:
+    cache:
+      embedded_cache:
+        enabled: true
+        max_size_mb: 100
+        ttl: 10m
+
+# =============================================================================
+# Ruler — alert rules từ logs, lưu trên S3
+# =============================================================================
+ruler:
+  storage:
+    type: s3
+    s3:
+      endpoint: "{{ vip_address }}:{{ minio_api_port }}"
+      bucketnames: "{{ loki_minio_bucket }}"
+      access_key_id: "{{ minio_root_user }}"
+      secret_access_key: "{{ minio_root_password }}"
+      insecure: true
+      s3forcepathstyle: true
+  rule_path: /loki/ruler/rules          # local temp dir khi evaluate
+  alertmanager_url: http://{{ vip_address }}:{{ alertmanager_port }}
+  ring:
+    kvstore:
+      store: memberlist
+  enable_api: true
+  enable_alertmanager_v2: true
+
+analytics:
+  reporting_enabled: false

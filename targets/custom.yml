@@ -1,0 +1,22 @@
+# =============================================================================
+# targets/custom.yml
+# Các exporter tùy chỉnh khác
+# =============================================================================
+
+groups: []
+
+  # ── Ví dụ thêm MySQL exporter ──
+  # - name: mysql-prod
+  #   labels:
+  #     role: database
+  #     site: HN4
+  #     env: production
+  #   hosts:
+  #     - { host: 10.x.x.60, port: 9104, labels: { cluster: mysql-primary } }
+
+  # ── HAProxy exporter ──
+  # - name: haproxy-external
+  #   labels:
+  #     role: lb
+  #   hosts:
+  #     - { host: 10.x.x.70, port: 9101 }

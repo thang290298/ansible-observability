@@ -1,0 +1,38 @@
+version: "3.8"
+# vmagent — scrape agent, active-active
+# Instance: {{ inventory_hostname }} ({{ ansible_host }})
+# Remote write: {{ vmagent_remote_write_url }}
+
+services:
+  vmagent:
+    image: victoriametrics/vmagent:{{ victoriametrics_version }}
+    container_name: vmagent
+    restart: unless-stopped
+    command:
+      - "--promscrape.config=/etc/vmagent/scrape.yml"
+      - "--promscrape.configCheckInterval=60s"
+      - "--remoteWrite.url={{ vmagent_remote_write_url }}"
+      - "--remoteWrite.tmpDataPath={{ vmagent_data_path }}"
+      - "--remoteWrite.maxDiskUsagePerURL=1073741824"
+      - "--httpListenAddr=:{{ vmagent_port }}"
+      - "--loggerLevel=INFO"
+    volumes:
+      - /etc/vmagent:/etc/vmagent:ro
+      - {{ vmagent_data_path }}:{{ vmagent_data_path }}
+    ports:
+      - "{{ vmagent_port }}:{{ vmagent_port }}"
+    mem_limit: "1g"
+    cpus: "1.0"
+    labels:
+      monitoring: "true"
+      component: "vmagent"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:{{ vmagent_port }}/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

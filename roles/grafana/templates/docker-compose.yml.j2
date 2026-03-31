@@ -1,0 +1,43 @@
+version: "3.8"
+
+# =============================================================================
+# Grafana — Dashboard & Visualization
+# PostgreSQL backend cho HA (shared state giữa các instances)
+# =============================================================================
+
+services:
+  grafana:
+    image: grafana/grafana:{{ grafana_version }}
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      GF_SERVER_HTTP_PORT: "{{ grafana_port }}"
+      GF_SERVER_ROOT_URL: "http://{{ vip_address }}:80/grafana/"
+      GF_DATABASE_TYPE: postgres
+      GF_DATABASE_HOST: "{{ grafana_db_host }}:{{ grafana_db_port }}"
+      GF_DATABASE_NAME: "{{ grafana_db_name }}"
+      GF_DATABASE_USER: "{{ grafana_db_user }}"
+      GF_DATABASE_PASSWORD: "{{ grafana_db_password }}"
+      GF_DATABASE_SSL_MODE: disable
+      GF_SECURITY_ADMIN_USER: "{{ grafana_admin_user }}"
+      GF_SECURITY_ADMIN_PASSWORD: "{{ grafana_admin_password }}"
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_LOG_LEVEL: info
+    volumes:
+      - {{ grafana_data_path }}:/var/lib/grafana
+      - ./provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "{{ grafana_port }}:{{ grafana_port }}"
+    labels:
+      monitoring: "true"
+      component: "grafana"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:{{ grafana_port }}/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

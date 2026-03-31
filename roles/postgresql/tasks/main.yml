@@ -1,0 +1,99 @@
+---
+# roles/postgresql/tasks/main.yml
+# Deploy PostgreSQL — Backend database cho Grafana và Gitea
+# Chạy trên: monitoring_db group
+
+- name: "[postgresql] Hiển thị cấu hình"
+  debug:
+    msg: |
+      ══════════════════════════════════════════
+      Deploying PostgreSQL {{ postgres_version }}
+      Node        : {{ inventory_hostname }} ({{ ansible_host }})
+      Port        : {{ postgres_port }}
+      Data path   : {{ postgres_data_path }}
+      ══════════════════════════════════════════
+
+# ── INSTALL ─────────────────────────────────────────────────────────────────
+
+- name: "[postgresql] Tạo thư mục config"
+  file:
+    path: "{{ monitoring_base_dir }}/postgresql"
+    state: directory
+    mode: '0755'
+  become: true
+  tags: [postgresql]
+
+- name: "[postgresql] Tạo thư mục data (owner postgres UID 999)"
+  file:
+    path: "{{ postgres_data_path }}"
+    state: directory
+    mode: '0700'
+    owner: "999"
+    group: "999"
+  become: true
+  tags: [postgresql]
+
+- name: "[postgresql] Pull PostgreSQL Docker image"
+  community.docker.docker_image:
+    name: "postgres:{{ postgres_version }}"
+    source: pull
+  tags: [postgresql]
+
+# ── CONFIGURE ────────────────────────────────────────────────────────────────
+
+- name: "[postgresql] Generate docker-compose"
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitoring_base_dir }}/postgresql/docker-compose.yml"
+    mode: '0644'
+    backup: true
+  notify: Restart postgresql
+  tags: [postgresql]
+
+- name: "[postgresql] Generate init SQL script"
+  template:
+    src: init.sql.j2
+    dest: "{{ monitoring_base_dir }}/postgresql/init.sql"
+    mode: '0644'
+  tags: [postgresql]
+
+# ── START SERVICE ─────────────────────────────────────────────────────────────
+
+- name: "[postgresql] Start PostgreSQL"
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/postgresql"
+    state: present
+  tags: [postgresql]
+
+# ── VERIFY ────────────────────────────────────────────────────────────────────
+
+- name: "[postgresql] Chờ PostgreSQL sẵn sàng"
+  command: >
+    docker exec postgresql pg_isready -U postgres
+  register: pg_ready
+  retries: 15
+  delay: 5
+  until: pg_ready.rc == 0
+  changed_when: false
+  tags: [postgresql, verify]
+
+- name: "[postgresql] Tạo database và user cho Grafana"
+  command: >
+    docker exec postgresql psql -U postgres -c
+    "SELECT 1 FROM pg_database WHERE datname='{{ grafana_db_name }}'"
+  register: grafana_db_check
+  changed_when: false
+  failed_when: false
+  tags: [postgresql]
+
+- name: "[postgresql] Init Grafana database nếu chưa tồn tại"
+  command: >
+    docker exec postgresql psql -U postgres -f /docker-entrypoint-initdb.d/init.sql
+  # [FIX M4] Dùng regex match thay vì string 'in' để tránh false negative
+  when: grafana_db_check.stdout_lines | select('match', '.*1 row.*') | list | length == 0
+  tags: [postgresql]
+
+- name: "[postgresql] ✅ PostgreSQL OK trên {{ inventory_hostname }}"
+  debug:
+    msg: "PostgreSQL running at {{ ansible_host }}:{{ postgres_port }}"
+  tags: [postgresql, verify]

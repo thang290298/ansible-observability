@@ -1,0 +1,15 @@
+# =============================================================================
+# targets/vmware.yml
+# VMware vSphere / ESXi exporters
+# =============================================================================
+
+groups: []
+
+  # ── Thêm VMware targets ──
+  # - name: vsphere-hn4
+  #   labels:
+  #     role: vmware
+  #     site: HN4
+  #     env: production
+  #   hosts:
+  #     - { host: 10.x.x.50, port: 9272, labels: { cluster: vsphere-hn4 } }

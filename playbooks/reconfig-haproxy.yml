@@ -1,0 +1,32 @@
+---
+# playbooks/reconfig-haproxy.yml
+# Cập nhật HAProxy config (không downtime — serial: 1)
+- name: "⚖️ [RECONFIG] Cập nhật HAProxy config"
+  hosts: monitoring_lb
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [reconfig, haproxy]
+
+  tasks:
+    - name: "[haproxy] Generate config mới"
+      template:
+        src: "{{ playbook_dir }}/../roles/haproxy/templates/haproxy.cfg.j2"
+        dest: /etc/haproxy/haproxy.cfg
+        backup: true
+        validate: "haproxy -c -f %s"
+      notify: Reload haproxy
+
+    - name: "[haproxy] Verify HAProxy running sau reload"
+      uri:
+        url: "http://{{ ansible_host }}:{{ haproxy_stats_port }}/stats"
+        status_code: [200, 301, 302]
+      retries: 3
+      delay: 3
+      ignore_errors: true
+
+  handlers:
+    - name: Reload haproxy
+      service:
+        name: haproxy
+        state: reloaded

@@ -1,0 +1,81 @@
+---
+# roles/haproxy/tasks/main.yml
+# Deploy HAProxy Load Balancer
+# Chạy trên: monitoring_lb group
+
+- name: "[haproxy] Hiển thị cấu hình"
+  debug:
+    msg: |
+      ══════════════════════════════════════════
+      Deploying HAProxy {{ haproxy_version }}
+      Node        : {{ inventory_hostname }} ({{ ansible_host }})
+      Stats port  : {{ haproxy_stats_port }}
+      ══════════════════════════════════════════
+
+# ── INSTALL ─────────────────────────────────────────────────────────────────
+
+- name: "[haproxy] Cài đặt HAProxy {{ haproxy_version }}"
+  package:
+    name: "haproxy={{ haproxy_version }}*"
+    state: present
+  become: true
+  tags: [haproxy]
+
+- name: "[haproxy] Tạo runtime directory"
+  file:
+    path: /run/haproxy
+    state: directory
+    mode: '0755'
+    owner: haproxy
+    group: haproxy
+  become: true
+  tags: [haproxy]
+
+# ── CONFIGURE ────────────────────────────────────────────────────────────────
+
+- name: "[haproxy] Generate HAProxy config"
+  template:
+    src: haproxy.cfg.j2
+    dest: /etc/haproxy/haproxy.cfg
+    mode: '0644'
+    validate: "haproxy -c -f %s"
+    backup: true
+  become: true
+  notify: Reload haproxy
+  tags: [haproxy]
+
+# ── START SERVICE ─────────────────────────────────────────────────────────────
+
+- name: "[haproxy] Enable và start HAProxy service"
+  systemd:
+    name: haproxy
+    state: started
+    enabled: true
+    daemon_reload: true
+  become: true
+  tags: [haproxy]
+
+# ── VERIFY ────────────────────────────────────────────────────────────────────
+
+- name: "[haproxy] Kiểm tra HAProxy đang chạy"
+  systemd:
+    name: haproxy
+  register: haproxy_service_status
+  become: true
+  tags: [haproxy, verify]
+
+- name: "[haproxy] Kiểm tra stats endpoint"
+  uri:
+    url: "http://localhost:{{ haproxy_stats_port }}/stats"
+    user: "{{ haproxy_stats_user }}"
+    password: "{{ haproxy_stats_password }}"
+    status_code: 200
+    force_basic_auth: true
+  retries: 5
+  delay: 3
+  tags: [haproxy, verify]
+
+- name: "[haproxy] ✅ HAProxy OK trên {{ inventory_hostname }}"
+  debug:
+    msg: "HAProxy stats at http://{{ ansible_host }}:{{ haproxy_stats_port }}/stats | State: {{ haproxy_service_status.status.ActiveState | default('unknown') }}"
+  tags: [haproxy, verify]

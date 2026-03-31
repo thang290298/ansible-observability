@@ -1,0 +1,35 @@
+version: "3.8"
+
+# =============================================================================
+# Loki — Log aggregation
+# Chạy trên {{ groups['monitoring_loki'] | length }} nodes
+# Nodes: {{ groups['monitoring_loki'] | map('extract', hostvars, 'ansible_host') | join(', ') }}
+# =============================================================================
+
+services:
+  loki:
+    image: grafana/loki:{{ loki_version }}
+    container_name: loki
+    restart: unless-stopped
+    command:
+      - "-config.file=/etc/loki/config.yml"
+      - "-config.expand-env=true"
+    volumes:
+      - ./config.yml:/etc/loki/config.yml:ro
+      - {{ loki_data_path }}:/loki          # mount toàn bộ: WAL + cache đều nằm đây
+    ports:
+      - "{{ loki_port }}:{{ loki_port }}"
+      - "{{ loki_grpc_port }}:{{ loki_grpc_port }}"
+    labels:
+      monitoring: "true"
+      component: "loki"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:{{ loki_port }}/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

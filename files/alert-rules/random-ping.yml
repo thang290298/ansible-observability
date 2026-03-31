@@ -1,0 +1,41 @@
+# Alert rules cho Random Ping Monitoring
+groups:
+  - name: random-ping
+    interval: 30s
+    rules:
+      # Rớt gói hoàn toàn
+      - alert: PingPacketLoss
+        expr: probe_success{job="random-ping"} == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "🔴 Rớt gói ping: {{ $labels.src_node }} → {{ $labels.dst_node }}"
+          description: |
+            Node {{ $labels.src_node }} ({{ $labels.src_ip }}) không ping được
+            {{ $labels.dst_node }} ({{ $labels.dst_ip }})
+            Thời gian phát hiện: {{ $labels.round_at }}
+
+      # Latency cao bất thường (> 50ms)
+      # [FIX M7/C2] probe_icmp_duration_seconds không tồn tại
+      # Metric đúng của blackbox exporter là probe_duration_seconds
+      - alert: PingHighLatency
+        expr: probe_duration_seconds{job="random-ping"} > 0.05
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "⚠️ Latency cao: {{ $labels.src_node }} → {{ $labels.dst_node }}"
+          description: |
+            Latency: {{ $value | humanizeDuration }}
+            {{ $labels.src_node }} → {{ $labels.dst_node }}
+
+      # Blackbox exporter down
+      - alert: BlackboxExporterDown
+        expr: up{job="blackbox"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "🔴 Blackbox Exporter down trên {{ $labels.instance }}"
+          description: "Không scrape được blackbox exporter — random ping bị ngừng"

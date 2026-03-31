@@ -1,0 +1,30 @@
+---
+# roles/vmstorage/tasks/main.yml
+- name: "[vmstorage] Tạo thư mục"
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ monitoring_base_dir }}/vmstorage"
+    - "{{ vm_storage_data_path }}"
+
+- name: "[vmstorage] Generate docker-compose"
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitoring_base_dir }}/vmstorage/docker-compose.yml"
+    backup: true
+  notify: Restart vmstorage
+
+- name: "[vmstorage] Start vmstorage"
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/vmstorage"
+    state: present
+
+- name: "[vmstorage] Health check"
+  uri:
+    url: "http://localhost:{{ vmstorage_port }}/health"
+    status_code: 200
+  retries: 10
+  delay: 5
+

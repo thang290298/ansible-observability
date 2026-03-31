@@ -1,0 +1,50 @@
+---
+# roles/vmagent/tasks/main.yml
+
+- name: "[vmagent] Tạo thư mục"
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ monitoring_base_dir }}/vmagent"
+    - "{{ vmagent_data_path }}"
+    - /etc/vmagent/targets
+
+- name: "[vmagent] Generate scrape config từ inventory"
+  template:
+    src: vmagent-scrape.yml.j2
+    dest: /etc/vmagent/scrape.yml
+    backup: true
+  notify: Reload vmagent
+
+- name: "[vmagent] Copy file-based targets"
+  copy:
+    src: "{{ playbook_dir }}/../targets/"
+    dest: /etc/vmagent/targets/
+    mode: '0644'
+  notify: Reload vmagent
+
+- name: "[vmagent] Generate docker-compose"
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitoring_base_dir }}/vmagent/docker-compose.yml"
+    backup: true
+  notify: Restart vmagent
+
+- name: "[vmagent] Start vmagent"
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/vmagent"
+    state: present
+
+- name: "[vmagent] Health check"
+  uri:
+    url: "http://localhost:{{ vmagent_port }}/health"
+    status_code: 200
+  retries: 10
+  delay: 5
+
+- name: "[vmagent] ✅ vmagent OK — scraping {{ groups['exporters'] | length }} exporters"
+  debug:
+    msg: "vmagent running on {{ inventory_hostname }}, remote_write → {{ vmagent_remote_write_url }}"
+  tags: [vmagent, verify]

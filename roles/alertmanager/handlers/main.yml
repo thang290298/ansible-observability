@@ -1,0 +1,6 @@
+---
+- name: Restart alertmanager
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/alertmanager"
+    state: present
+    recreate: always

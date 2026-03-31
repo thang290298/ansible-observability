@@ -1,0 +1,8 @@
+---
+# playbooks/reconfig-all.yml
+# Reconfig toàn bộ hệ thống — chạy tất cả reconfig playbooks
+- import_playbook: reconfig-targets.yml
+- import_playbook: reconfig-alerts.yml
+- import_playbook: reconfig-haproxy.yml
+- import_playbook: reconfig-grafana.yml
+- import_playbook: reconfig-alertmanager.yml

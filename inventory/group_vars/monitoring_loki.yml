@@ -1,0 +1,11 @@
+---
+# inventory/group_vars/monitoring_loki.yml
+# Biến riêng cho Loki nodes — tự tính từ group
+
+# Loki cluster peers (memberlist tự tìm nhau)
+loki_peers: >-
+  {{ groups['monitoring_loki']
+     | map('extract', hostvars, 'ansible_host')
+     | list }}
+
+loki_node_count: "{{ groups['monitoring_loki'] | length }}"

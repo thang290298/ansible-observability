@@ -1,0 +1,240 @@
+---
+# playbooks/upgrade.yml
+# Rolling upgrade — verify healthy trước khi chuyển sang node tiếp theo
+
+- name: "🔄 [UPGRADE] vmstorage — rolling 1 node/lần"
+  hosts: monitoring_storage
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [upgrade-storage]
+
+  pre_tasks:
+    - name: "[upgrade] Kiểm tra cluster còn đủ nodes healthy"
+      uri:
+        url: "http://{{ hostvars[item]['ansible_host'] }}:{{ vmstorage_port }}/health"
+        status_code: 200
+      loop: "{{ groups['monitoring_storage'] | difference([inventory_hostname]) }}"
+      retries: 5
+      delay: 5
+
+  tasks:
+    - name: "[upgrade] Pull image mới"
+      community.docker.docker_image:
+        name: "victoriametrics/vmstorage:{{ victoriametrics_version }}"
+        source: pull
+        force_source: true
+
+    - name: "[upgrade] Restart với image mới"
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_base_dir }}/vmstorage"
+        state: present
+        recreate: always
+        pull: always
+
+    - name: "[upgrade] Chờ vmstorage healthy trở lại"
+      uri:
+        url: "http://{{ ansible_host }}:{{ vmstorage_port }}/health"
+        status_code: 200
+      retries: 20
+      delay: 5
+
+- name: "🔄 [UPGRADE] vminsert + vmselect"
+  hosts: monitoring_query
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [upgrade-query]
+
+  pre_tasks:
+    - name: "[upgrade] Kiểm tra còn vminsert nodes healthy"
+      uri:
+        url: "http://{{ hostvars[item]['ansible_host'] }}:{{ vminsert_port }}/health"
+        status_code: 200
+      loop: "{{ groups['monitoring_query'] | difference([inventory_hostname]) }}"
+      retries: 5
+      delay: 5
+
+  tasks:
+    - name: "[upgrade] Pull + restart vminsert"
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_base_dir }}/vminsert"
+        state: present
+        recreate: always
+        pull: always
+
+    - name: "[upgrade] Pull + restart vmselect"
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_base_dir }}/vmselect"
+        state: present
+        recreate: always
+        pull: always
+
+    - name: "[upgrade] Chờ healthy"
+      uri:
+        url: "http://{{ ansible_host }}:{{ vminsert_port }}/health"
+        status_code: 200
+      retries: 15
+      delay: 5
+
+- name: "📊 [UPGRADE] Grafana"
+  hosts: monitoring_grafana
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [upgrade-grafana]
+
+  pre_tasks:
+    - name: "[upgrade] Kiểm tra còn Grafana nodes healthy"
+      uri:
+        url: "http://{{ hostvars[item]['ansible_host'] }}:{{ grafana_port }}/api/health"
+        status_code: 200
+      loop: "{{ groups['monitoring_grafana'] | difference([inventory_hostname]) }}"
+      retries: 5
+      delay: 5
+
+  tasks:
+    - name: "[upgrade] Pull + restart Grafana"
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_base_dir }}/grafana"
+        state: present
+        recreate: always
+        pull: always
+
+    - name: "[upgrade] Chờ Grafana healthy"
+      uri:
+        url: "http://{{ ansible_host }}:{{ grafana_port }}/api/health"
+        status_code: 200
+      retries: 20
+      delay: 5
+
+- name: "🔔 [UPGRADE] Alertmanager"
+  hosts: monitoring_alertmanager
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [upgrade-alertmanager]
+
+  tasks:
+    - name: "[upgrade] Pull + restart Alertmanager"
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_base_dir }}/alertmanager"
+        state: present
+        recreate: always
+        pull: always
+
+    - name: "[upgrade] Chờ Alertmanager healthy"
+      uri:
+        url: "http://{{ ansible_host }}:{{ alertmanager_port }}/-/healthy"
+        status_code: 200
+      retries: 15
+      delay: 5
+
+- name: "📋 [UPGRADE] Loki"
+  hosts: monitoring_loki
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [upgrade-loki]
+
+  pre_tasks:
+    - name: "[upgrade] Kiểm tra còn Loki nodes healthy"
+      uri:
+        url: "http://{{ hostvars[item]['ansible_host'] }}:{{ loki_port }}/ready"
+        status_code: 200
+      loop: "{{ groups['monitoring_loki'] | difference([inventory_hostname]) }}"
+      retries: 5
+      delay: 5
+
+  tasks:
+    - name: "[upgrade] Pull + restart Loki"
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_base_dir }}/loki"
+        state: present
+        recreate: always
+        pull: always
+
+    - name: "[upgrade] Chờ Loki ready"
+      uri:
+        url: "http://{{ ansible_host }}:{{ loki_port }}/ready"
+        status_code: 200
+      retries: 20
+      delay: 5
+
+- name: "🪵 [UPGRADE] Promtail — tất cả nodes"
+  hosts: promtail_nodes
+  become: true
+  gather_facts: false
+  tags: [upgrade-promtail]
+
+  tasks:
+    - name: "[upgrade] Download Promtail binary mới"
+      get_url:
+        url: "https://github.com/grafana/loki/releases/download/{{ loki_version }}/promtail-linux-amd64.zip"
+        dest: "/tmp/promtail-linux-amd64.zip"
+        mode: '0644'
+        force: true
+
+    - name: "[upgrade] Extract + replace binary"
+      unarchive:
+        src: /tmp/promtail-linux-amd64.zip
+        dest: /usr/local/bin/
+        remote_src: true
+        mode: '0755'
+
+    - name: "[upgrade] Rename binary"
+      shell: mv -f /usr/local/bin/promtail-linux-amd64 /usr/local/bin/promtail && chmod +x /usr/local/bin/promtail
+
+    - name: "[upgrade] Restart Promtail"
+      systemd:
+        name: promtail
+        state: restarted
+
+    - name: "[upgrade] Verify Promtail running"
+      uri:
+        url: "http://localhost:{{ promtail_port }}/ready"
+        status_code: 200
+      retries: 10
+      delay: 3
+
+- name: "📊 [UPGRADE] node_exporter — tất cả exporters"
+  hosts: exporters
+  become: true
+  gather_facts: false
+  tags: [upgrade-node-exporter]
+
+  tasks:
+    - name: "[upgrade] Download node_exporter mới"
+      get_url:
+        url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+        dest: "/tmp/node_exporter.tar.gz"
+        mode: '0644'
+        force: true
+
+    - name: "[upgrade] Extract node_exporter"
+      unarchive:
+        src: /tmp/node_exporter.tar.gz
+        dest: /tmp/
+        remote_src: true
+
+    - name: "[upgrade] Replace binary"
+      copy:
+        src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+        dest: /usr/local/bin/node_exporter
+        mode: '0755'
+        remote_src: true
+
+    - name: "[upgrade] Restart node_exporter"
+      systemd:
+        name: node_exporter
+        state: restarted
+
+    - name: "[upgrade] Verify node_exporter"
+      uri:
+        url: "http://localhost:{{ node_exporter_port }}/metrics"
+        status_code: 200
+      retries: 5
+      delay: 3
+
+- name: "✅ [UPGRADE] Verify sau upgrade"
+  import_playbook: verify.yml

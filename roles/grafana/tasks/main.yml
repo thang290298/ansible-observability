@@ -1,0 +1,91 @@
+---
+# roles/grafana/tasks/main.yml
+# Deploy Grafana với PostgreSQL backend (HA-ready)
+# Chạy trên: monitoring_grafana group
+
+- name: "[grafana] Hiển thị cấu hình"
+  debug:
+    msg: |
+      ══════════════════════════════════════════
+      Deploying Grafana {{ grafana_version }}
+      Node        : {{ inventory_hostname }} ({{ ansible_host }})
+      HTTP port   : {{ grafana_port }}
+      Data path   : {{ grafana_data_path }}
+      DB host     : {{ grafana_db_host }}:{{ grafana_db_port }}
+      DB name     : {{ grafana_db_name }}
+      ══════════════════════════════════════════
+
+# ── INSTALL ─────────────────────────────────────────────────────────────────
+
+- name: "[grafana] Tạo thư mục"
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ monitoring_base_dir }}/grafana"
+    - "{{ monitoring_base_dir }}/grafana/provisioning"
+    - "{{ monitoring_base_dir }}/grafana/provisioning/datasources"
+    - "{{ monitoring_base_dir }}/grafana/provisioning/dashboards"
+  become: true
+  tags: [grafana]
+
+- name: "[grafana] Tạo thư mục data (owner grafana UID 472)"
+  file:
+    path: "{{ grafana_data_path }}"
+    state: directory
+    mode: '0755'
+    owner: "472"
+    group: "472"
+  become: true
+  tags: [grafana]
+
+- name: "[grafana] Pull Grafana Docker image"
+  community.docker.docker_image:
+    name: "grafana/grafana:{{ grafana_version }}"
+    source: pull
+  tags: [grafana]
+
+# ── CONFIGURE ────────────────────────────────────────────────────────────────
+
+- name: "[grafana] Generate datasources provisioning"
+  template:
+    src: provisioning/datasources.yml.j2
+    dest: "{{ monitoring_base_dir }}/grafana/provisioning/datasources/datasources.yml"
+    mode: '0644'
+    backup: true
+  notify: Restart grafana
+  tags: [grafana]
+
+- name: "[grafana] Generate docker-compose"
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitoring_base_dir }}/grafana/docker-compose.yml"
+    mode: '0644'
+    backup: true
+  notify: Restart grafana
+  tags: [grafana]
+
+# ── START SERVICE ─────────────────────────────────────────────────────────────
+
+- name: "[grafana] Start Grafana"
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/grafana"
+    state: present
+  tags: [grafana]
+
+# ── VERIFY ────────────────────────────────────────────────────────────────────
+
+- name: "[grafana] Chờ Grafana sẵn sàng"
+  uri:
+    url: "http://localhost:{{ grafana_port }}/api/health"
+    status_code: 200
+  retries: 20
+  delay: 5
+  register: grafana_health
+  tags: [grafana, verify]
+
+- name: "[grafana] ✅ Grafana OK trên {{ inventory_hostname }}"
+  debug:
+    msg: "Grafana running at http://{{ ansible_host }}:{{ grafana_port }}"
+  tags: [grafana, verify]

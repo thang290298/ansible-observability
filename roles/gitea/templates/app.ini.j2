@@ -1,0 +1,51 @@
+APP_NAME = VNPT Cloud Git
+RUN_MODE = prod
+
+[server]
+PROTOCOL        = http
+HTTP_PORT       = {{ gitea_port }}
+SSH_PORT        = {{ gitea_ssh_port }}
+DOMAIN          = {{ ansible_host }}
+ROOT_URL        = http://{{ ansible_host }}:{{ gitea_port }}/
+DISABLE_SSH     = false
+START_SSH_SERVER= false
+
+[database]
+DB_TYPE  = postgres
+HOST     = {{ hostvars[groups['monitoring_db'][0]]['ansible_host'] }}:{{ postgres_port }}
+NAME     = gitea
+USER     = gitea
+PASSWD   = {{ gitea_db_password }}
+SSL_MODE = disable
+
+[repository]
+ROOT = /data/repositories
+DEFAULT_BRANCH = main
+
+[log]
+MODE      = console
+LEVEL     = info
+ROOT_PATH = /data/log
+
+[security]
+INSTALL_LOCK   = true
+SECRET_KEY     = {{ ansible_webhook_secret }}
+MIN_PASSWORD_LENGTH = 12
+
+[service]
+DISABLE_REGISTRATION        = false
+REQUIRE_SIGNIN_VIEW         = false
+REGISTER_EMAIL_CONFIRM      = false
+ENABLE_NOTIFY_MAIL          = false
+ALLOW_ONLY_EXTERNAL_REGISTRATION = false
+ENABLE_CAPTCHA              = false
+DEFAULT_KEEP_EMAIL_PRIVATE  = true
+DEFAULT_ALLOW_CREATE_ORGANIZATION = true
+DEFAULT_ENABLE_TIMETRACKING = true
+NO_REPLY_ADDRESS            = noreply@localhost
+
+[webhook]
+ALLOWED_HOST_LIST = *
+
+[picture]
+DISABLE_GRAVATAR = true

@@ -1,0 +1,84 @@
+---
+# roles/alertmanager/tasks/main.yml
+# Deploy Alertmanager cluster với gossip-based HA
+# Chạy trên: monitoring_alertmanager group
+
+- name: "[alertmanager] Hiển thị cấu hình"
+  debug:
+    msg: |
+      ══════════════════════════════════════════
+      Deploying Alertmanager {{ alertmanager_version }}
+      Node        : {{ inventory_hostname }} ({{ ansible_host }})
+      HTTP port   : {{ alertmanager_port }}
+      Cluster port: {{ alertmanager_cluster_port }}
+      Data path   : {{ alertmanager_data_path }}
+      Peers       : {{ alertmanager_peers | join(', ') }}
+      ══════════════════════════════════════════
+
+# ── INSTALL ─────────────────────────────────────────────────────────────────
+
+- name: "[alertmanager] Tạo thư mục config"
+  file:
+    path: "{{ monitoring_base_dir }}/alertmanager"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: "[alertmanager] Tạo thư mục data (owner nobody UID 65534)"
+  file:
+    path: "{{ alertmanager_data_path }}"
+    state: directory
+    mode: '0755'
+    owner: "65534"
+    group: "65534"
+  become: true
+
+- name: "[alertmanager] Pull Docker image"
+  community.docker.docker_image:
+    name: "prom/alertmanager:{{ alertmanager_version }}"
+    source: pull
+  tags: [alertmanager]
+
+# ── CONFIGURE ────────────────────────────────────────────────────────────────
+
+- name: "[alertmanager] Generate alertmanager config"
+  template:
+    src: config.yml.j2
+    dest: "{{ monitoring_base_dir }}/alertmanager/config.yml"
+    mode: '0644'
+    backup: true
+  notify: Restart alertmanager
+  tags: [alertmanager]
+
+- name: "[alertmanager] Generate docker-compose"
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitoring_base_dir }}/alertmanager/docker-compose.yml"
+    mode: '0644'
+    backup: true
+  notify: Restart alertmanager
+  tags: [alertmanager]
+
+# ── START SERVICE ─────────────────────────────────────────────────────────────
+
+- name: "[alertmanager] Start Alertmanager"
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/alertmanager"
+    state: present
+  tags: [alertmanager]
+
+# ── VERIFY ────────────────────────────────────────────────────────────────────
+
+- name: "[alertmanager] Chờ Alertmanager sẵn sàng"
+  uri:
+    url: "http://localhost:{{ alertmanager_port }}/-/healthy"
+    status_code: 200
+  retries: 15
+  delay: 5
+  register: alertmanager_health
+  tags: [alertmanager, verify]
+
+- name: "[alertmanager] ✅ Alertmanager OK trên {{ inventory_hostname }}"
+  debug:
+    msg: "Alertmanager running at {{ ansible_host }}:{{ alertmanager_port }}"
+  tags: [alertmanager, verify]

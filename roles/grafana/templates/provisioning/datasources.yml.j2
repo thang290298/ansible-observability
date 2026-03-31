@@ -1,0 +1,40 @@
+apiVersion: 1
+
+datasources:
+  - name: VictoriaMetrics
+    uid: "victoriametrics-main"
+    type: prometheus
+    access: proxy
+    url: "{{ grafana_vm_datasource_url }}"
+    isDefault: true
+    editable: false
+    jsonData:
+      timeInterval: "{{ vmagent_scrape_interval }}"
+      httpMethod: POST
+      queryTimeout: "60s"
+
+  - name: Loki
+    uid: "loki-main"
+    type: loki
+    access: proxy
+    url: "{{ grafana_loki_datasource_url }}"
+    isDefault: false
+    editable: false
+    jsonData:
+      maxLines: 5000
+      timeout: "60"
+      derivedFields:
+        - datasourceUid: "victoriametrics-main"
+          matcherRegex: "instance=(\\S+)"
+          name: "instance"
+          url: ""
+
+  - name: Alertmanager
+    uid: "alertmanager-main"
+    type: alertmanager
+    access: proxy
+    url: "http://{{ vip_address }}:{{ alertmanager_port }}"
+    isDefault: false
+    editable: false
+    jsonData:
+      implementation: prometheus

@@ -1,0 +1,4 @@
+﻿---
+# roles/gitea/defaults/main.yml
+# Role-level defaults - can be overridden by group_vars/all.yml or host_vars
+

@@ -1,0 +1,168 @@
+﻿---
+# vmagent scrape config — auto-generated từ inventory
+# Tất cả groups trong exporters được scrape tự động
+# Thêm client mới: chỉ thêm vào targets/*.yml rồi ./run.sh reconfig
+
+scrape_configs:
+
+  # ==========================================================================
+  # SELF-MONITORING — monitoring stack tự monitor lẫn nhau
+  # ==========================================================================
+  - job_name: vmstorage
+    static_configs:
+{% for host in groups['monitoring_storage'] %}
+      - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ vmstorage_port }}"]
+        labels:
+          instance: "{{ host }}"
+          component: vmstorage
+          site: "{{ hostvars[host]['site'] | default('monitoring') }}"
+{% endfor %}
+
+  - job_name: vminsert
+    static_configs:
+{% for host in groups['monitoring_query'] %}
+      - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ vminsert_port }}"]
+        labels:
+          instance: "{{ host }}"
+          component: vminsert
+{% endfor %}
+
+  - job_name: vmselect
+    static_configs:
+{% for host in groups['monitoring_query'] %}
+      - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ vmselect_port }}"]
+        labels:
+          instance: "{{ host }}"
+          component: vmselect
+{% endfor %}
+
+  - job_name: grafana
+    static_configs:
+{% for host in groups['monitoring_grafana'] %}
+      - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ grafana_port }}"]
+        labels:
+          instance: "{{ host }}"
+          component: grafana
+{% endfor %}
+
+  - job_name: alertmanager
+    static_configs:
+{% for host in groups['monitoring_alertmanager'] %}
+      - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ alertmanager_port }}"]
+        labels:
+          instance: "{{ host }}"
+          component: alertmanager
+{% endfor %}
+
+  - job_name: loki
+    static_configs:
+{% for host in groups['monitoring_loki'] %}
+      - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ loki_port }}"]
+        labels:
+          instance: "{{ host }}"
+          component: loki
+{% endfor %}
+
+  - job_name: promtail
+    static_configs:
+{% for host in groups['promtail_nodes'] %}
+      - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ promtail_port }}"]
+        labels:
+          instance: "{{ host }}"
+          site: "{{ hostvars[host]['site'] | default('unknown') }}"
+          role: "{{ hostvars[host]['role'] | default('server') }}"
+{% endfor %}
+
+  - job_name: minio
+    static_configs:
+{% for host in groups['monitoring_loki'] %}
+      - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ minio_api_port }}"]
+        labels:
+          instance: "{{ host }}"
+          component: minio
+{% endfor %}
+    metrics_path: /minio/v2/metrics/cluster
+
+  - job_name: haproxy
+    static_configs:
+{% for host in groups['monitoring_lb'] %}
+      - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ haproxy_stats_port }}"]
+        labels:
+          instance: "{{ host }}"
+          component: haproxy
+{% endfor %}
+    params:
+      stats: [prometheus]
+
+  - job_name: vmagent
+    static_configs:
+{% for host in groups['monitoring_vmagent'] %}
+      - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ vmagent_port }}"]
+        labels:
+          instance: "{{ host }}"
+          component: vmagent
+{% endfor %}
+
+  # ==========================================================================
+  # INFRASTRUCTURE NODES — từ targets/*.yml
+  # File-based service discovery: thêm/xóa targets không cần restart vmagent
+  # ==========================================================================
+  - job_name: node_exporter
+    scrape_interval: "{{ vmagent_scrape_interval }}"
+    file_sd_configs:
+      - files:
+          - /etc/vmagent/targets/node_exporter.yml
+        refresh_interval: 60s
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '(.+)(?::\d+)?'
+        replacement: "${1}:{{ node_exporter_port }}"
+        target_label: __address__
+
+  - job_name: ceph_exporter
+    scrape_interval: 30s
+    file_sd_configs:
+      - files:
+          - /etc/vmagent/targets/ceph.yml
+        refresh_interval: 60s
+
+  - job_name: openstack_exporter
+    scrape_interval: 60s
+    file_sd_configs:
+      - files:
+          - /etc/vmagent/targets/openstack.yml
+        refresh_interval: 60s
+
+  # ============================================================
+  # RANDOM PING — Blackbox ICMP
+  # ============================================================
+  - job_name: "random-ping"
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    file_sd_configs:
+      - files:
+          - /etc/blackbox/random-ping-targets.yml
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      # [FIX H3] Preserve all custom labels from file_sd (src_node, dst_node, etc.)
+      - action: labelmap
+        regex: (.+)
+      - source_labels: [src_node]
+        target_label: src_node
+      - source_labels: [dst_node]
+        target_label: dst_node
+      - target_label: __address__
+        replacement: "{{ hostvars[groups['monitoring_lb'][0]]['ansible_host'] }}:9115"
+
+  - job_name: "blackbox"
+    static_configs:
+{% for host in groups['monitoring_lb'] %}
+      - targets: ["{{ hostvars[host]['ansible_host'] }}:9115"]
+        labels:
+          instance: "{{ host }}"
+{% endfor %}

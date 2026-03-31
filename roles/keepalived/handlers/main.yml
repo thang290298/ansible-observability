@@ -1,0 +1,12 @@
+---
+- name: Restart keepalived
+  systemd:
+    name: keepalived
+    state: restarted
+  become: true
+
+- name: Reload keepalived
+  systemd:
+    name: keepalived
+    state: reloaded
+  become: true

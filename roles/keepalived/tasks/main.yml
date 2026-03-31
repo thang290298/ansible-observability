@@ -1,0 +1,41 @@
+---
+# roles/keepalived/tasks/main.yml
+
+- name: "[keepalived] Cài đặt keepalived"
+  package:
+    name: keepalived
+    state: present
+  become: true
+  tags: [keepalived]
+
+- name: "[keepalived] Generate cấu hình"
+  template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    backup: true
+  become: true
+  notify: Restart keepalived
+  tags: [keepalived]
+
+- name: "[keepalived] Enable và start service"
+  service:
+    name: keepalived
+    state: started
+    enabled: true
+  become: true
+  tags: [keepalived]
+
+- name: "[keepalived] Verify VIP trên MASTER node"
+  shell: ip addr show | grep "{{ vip_address }}"
+  register: vip_result
+  changed_when: false
+  failed_when: false
+  when: groups['monitoring_lb'].index(inventory_hostname) == 0
+  tags: [keepalived, verify]
+
+- name: "[keepalived] ✅ VIP status"
+  debug:
+    msg: "VIP {{ vip_address }} {{ 'ACTIVE ✅' if (vip_result.rc | default(1)) == 0 else 'NOT YET (waiting for election)' }} on {{ inventory_hostname }}"
+  when: groups['monitoring_lb'].index(inventory_hostname) == 0
+  tags: [keepalived, verify]
+

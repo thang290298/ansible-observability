@@ -1,0 +1,190 @@
+---
+# playbooks/scale.yml
+# =============================================================================
+# Scale từng service cụ thể — không động đến service khác
+# =============================================================================
+
+- name: "📋 [SCALE] Phân tích kế hoạch scale"
+  hosts: localhost
+  gather_facts: false
+  run_once: true
+
+  tasks:
+    - name: "[scale] Tổng quan hệ thống sau khi scale"
+      debug:
+        msg: |
+          ══════════════════════════════════════════════════════════════
+          TRẠNG THÁI SAU KHI SCALE:
+          ══════════════════════════════════════════════════════════════
+          monitoring_lb          : {{ groups['monitoring_lb'] | length }} nodes
+          monitoring_storage     : {{ groups['monitoring_storage'] | length }} nodes  (vmstorage)
+          monitoring_query       : {{ groups['monitoring_query'] | length }} nodes  (vminsert + vmselect)
+          monitoring_grafana     : {{ groups['monitoring_grafana'] | length }} nodes  (grafana)
+          monitoring_vmagent     : {{ groups['monitoring_vmagent'] | length }} nodes  (vmagent)
+          monitoring_alertmanager: {{ groups['monitoring_alertmanager'] | length }} nodes  (alertmanager)
+          monitoring_db          : {{ groups['monitoring_db'] | length }} nodes  (postgresql)
+          monitoring_gitea       : {{ groups['monitoring_gitea'] | length }} nodes  (gitea)
+          ──────────────────────────────────────────────────────────────
+          exporters tổng cộng    : {{ groups['exporters'] | length }} nodes
+          ══════════════════════════════════════════════════════════════
+
+    - name: "[scale] Xác nhận"
+      pause:
+        prompt: "Bấm Enter để tiếp tục scale hoặc Ctrl+C để hủy"
+
+# ── Scale vmstorage ──
+- name: "💾 [SCALE] vmstorage — monitoring_storage"
+  hosts: monitoring_storage
+  become: true
+  gather_facts: true
+  tags: [scale-storage]
+  serial: 1
+
+  tasks:
+    - name: "[scale-storage] Setup node mới (nếu chưa có)"
+      include_role: { name: common }
+      when: "'docker' not in ansible_facts.packages"
+
+    - name: "[scale-storage] Cài Docker"
+      include_role: { name: docker }
+      when: "'docker-ce' not in ansible_facts.packages"
+
+    - name: "[scale-storage] Deploy vmstorage"
+      include_role: { name: vmstorage }
+
+    - name: "[scale-storage] Cập nhật vminsert/vmselect biết về storage node mới"
+      include_role: { name: vminsert }
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['monitoring_query'] }}"
+
+    - name: "[scale-storage] ✅ vmstorage scaled: {{ groups['monitoring_storage'] | length }} nodes"
+      debug:
+        msg: "storageNodes: {{ groups['monitoring_storage'] | map('extract', hostvars, 'ansible_host') | list }}"
+
+# ── Scale vminsert/vmselect (query layer) ──
+- name: "🔄 [SCALE] vminsert + vmselect — monitoring_query"
+  hosts: monitoring_query
+  become: true
+  gather_facts: true
+  tags: [scale-query]
+  serial: 1
+
+  tasks:
+    - name: "[scale-query] Setup + Deploy vminsert/vmselect"
+      include_role: { name: common }
+      when: "'docker' not in ansible_facts.packages"
+
+    - name: "[scale-query] Cài Docker"
+      include_role: { name: docker }
+      when: "'docker-ce' not in ansible_facts.packages"
+
+    - name: "[scale-query] Deploy vminsert + vmselect"
+      include_role: { name: "{{ item }}" }
+      loop: [vminsert, vmselect]
+
+    - name: "[scale-query] Cập nhật HAProxy backends"
+      template:
+        src: "{{ playbook_dir }}/../templates/haproxy.cfg.j2"
+        dest: /etc/haproxy/haproxy.cfg
+        validate: "haproxy -c -f %s"
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['monitoring_lb'] }}"
+      notify: Reload haproxy on lb
+
+    - name: "[scale-query] ✅ query layer scaled: {{ groups['monitoring_query'] | length }} nodes"
+      debug:
+        msg: "vminsert/vmselect running on: {{ groups['monitoring_query'] | map('extract', hostvars, 'ansible_host') | list }}"
+
+  handlers:
+    - name: Reload haproxy on lb
+      service: { name: haproxy, state: reloaded }
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['monitoring_lb'] }}"
+
+# ── Scale Grafana ──
+- name: "📊 [SCALE] Grafana — monitoring_grafana"
+  hosts: monitoring_grafana
+  become: true
+  gather_facts: true
+  tags: [scale-grafana]
+
+  tasks:
+    - name: "[scale-grafana] Setup + Deploy Grafana"
+      include_role: { name: common }
+      when: "'docker' not in ansible_facts.packages"
+
+    - name: "[scale-grafana] Cài Docker"
+      include_role: { name: docker }
+      when: "'docker-ce' not in ansible_facts.packages"
+
+    - name: "[scale-grafana] Deploy Grafana"
+      include_role: { name: grafana }
+
+    - name: "[scale-grafana] Cập nhật HAProxy backends"
+      template:
+        src: "{{ playbook_dir }}/../templates/haproxy.cfg.j2"
+        dest: /etc/haproxy/haproxy.cfg
+        validate: "haproxy -c -f %s"
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['monitoring_lb'] }}"
+      notify: Reload haproxy
+
+    - name: "[scale-grafana] ✅ Grafana scaled: {{ groups['monitoring_grafana'] | length }} nodes"
+      debug:
+        msg: "Grafana running on: {{ groups['monitoring_grafana'] | map('extract', hostvars, 'ansible_host') | list }}"
+
+  handlers:
+    - name: Reload haproxy
+      service: { name: haproxy, state: reloaded }
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['monitoring_lb'] }}"
+
+# ── Scale vmagent ──
+- name: "🔍 [SCALE] vmagent — monitoring_vmagent"
+  hosts: monitoring_vmagent
+  become: true
+  gather_facts: true
+  tags: [scale-vmagent]
+
+  tasks:
+    - name: "[scale-vmagent] Setup + Deploy vmagent"
+      include_role: { name: common }
+      when: "'docker' not in ansible_facts.packages"
+
+    - name: "[scale-vmagent] Cài Docker"
+      include_role: { name: docker }
+      when: "'docker-ce' not in ansible_facts.packages"
+
+    - name: "[scale-vmagent] Deploy vmagent với scrape config đầy đủ"
+      include_role: { name: vmagent }
+
+    - name: "[scale-vmagent] ✅ vmagent scaled: {{ groups['monitoring_vmagent'] | length }} nodes (active-active)"
+      debug:
+        msg: |
+          vmagent chạy trên: {{ groups['monitoring_vmagent'] | map('extract', hostvars, 'ansible_host') | list }}
+          Mỗi instance scrape TẤT CẢ {{ groups['exporters'] | length }} targets
+          vmselect tự dedup — không lo duplicate metrics
+
+# ── Scale Alertmanager ──
+- name: "🔔 [SCALE] Alertmanager — monitoring_alertmanager"
+  hosts: monitoring_alertmanager
+  become: true
+  gather_facts: true
+  tags: [scale-alertmanager]
+
+  tasks:
+    - name: "[scale-alertmanager] Deploy Alertmanager với peers mới"
+      include_role: { name: alertmanager }
+
+    - name: "[scale-alertmanager] Restart tất cả Alertmanager để cập nhật peers"
+      shell: docker restart alertmanager
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['monitoring_alertmanager'] }}"
+
+    - name: "[scale-alertmanager] ✅ Alertmanager scaled: {{ groups['monitoring_alertmanager'] | length }} nodes"
+      debug:
+        msg: "peers: {{ alertmanager_peers }}"
+
+# ── Verify sau khi scale ──
+- name: "✅ [SCALE] Verify toàn bộ sau scale"
+  import_playbook: verify.yml

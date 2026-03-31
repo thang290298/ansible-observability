@@ -1,0 +1,48 @@
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.vnpt.vn:587'
+
+route:
+  group_by: [alertname, cluster, severity]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: telegram-warning
+  routes:
+    - match:
+        severity: critical
+      receiver: telegram-critical
+      repeat_interval: 1h
+    - match:
+        severity: warning
+      receiver: telegram-warning
+
+receivers:
+  - name: telegram-critical
+    telegram_configs:
+      - bot_token: "{{ telegram_bot_token }}"
+        chat_id: {{ telegram_critical_chat_id }}
+        parse_mode: HTML
+        message: |
+          🔴 <b>CRITICAL</b>: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}
+          📍 Host: <code>{{ "{{" }} .CommonLabels.instance {{ "}}" }}</code>
+          🏷 Cluster: {{ "{{" }} .CommonLabels.cluster {{ "}}" }}
+          📝 {{ "{{" }} .CommonAnnotations.description {{ "}}" }}
+          ⏱ Fired: {{ "{{" }} .CommonAnnotations.fired_at {{ "}}" }}
+
+  - name: telegram-warning
+    telegram_configs:
+      - bot_token: "{{ telegram_bot_token }}"
+        chat_id: {{ telegram_chat_id }}
+        parse_mode: HTML
+        message: |
+          🟡 <b>WARNING</b>: {{ "{{" }} .GroupLabels.alertname {{ "}}" }}
+          📍 Host: <code>{{ "{{" }} .CommonLabels.instance {{ "}}" }}</code>
+          📝 {{ "{{" }} .CommonAnnotations.description {{ "}}" }}
+
+inhibit_rules:
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: [alertname, instance]

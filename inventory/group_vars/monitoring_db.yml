@@ -1,0 +1,6 @@
+---
+# inventory/group_vars/monitoring_db.yml
+# Biến riêng cho PostgreSQL nodes
+
+pg_primary: "{{ (groups['monitoring_db'] | map('extract', hostvars) | selectattr('pg_role', 'equalto', 'primary') | map(attribute='ansible_host') | list)[0] }}"
+pg_replicas: "{{ groups['monitoring_db'] | map('extract', hostvars) | selectattr('pg_role', 'equalto', 'replica') | map(attribute='ansible_host') | list }}"

@@ -1,0 +1,6 @@
+---
+- name: Restart victoriametrics
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/victoriametrics"
+    state: present
+    recreate: always

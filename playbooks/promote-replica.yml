@@ -1,0 +1,102 @@
+---
+# playbooks/promote-replica.yml
+# =============================================================================
+# Manual failover PostgreSQL: promote replica lên primary
+#
+# Cách dùng:
+#   ansible-playbook -i inventory/hosts.yml playbooks/promote-replica.yml \
+#     -e "target_node=node02" --ask-vault-pass
+#
+# Hoặc qua run.sh:
+#   ./run.sh promote-pg
+# =============================================================================
+
+- name: "🗄️  [PG-FAILOVER] Kiểm tra trạng thái PostgreSQL"
+  hosts: monitoring_db
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: "[pg-failover] Validate target_node đã được truyền vào"
+      run_once: true
+      fail:
+        msg: |
+          ❌ Thiếu tham số target_node!
+          Dùng: ansible-playbook ... promote-replica.yml -e "target_node=node02"
+      when: target_node is not defined
+
+    - name: "[pg-failover] Kiểm tra PostgreSQL running"
+      command: docker exec postgresql pg_isready -U postgres
+      register: pg_ready
+      ignore_errors: true
+
+    - name: "[pg-failover] Lấy role hiện tại"
+      command: >
+        docker exec postgresql psql -U postgres -tAc "SELECT pg_is_in_recovery();"
+      register: pg_role_check
+      ignore_errors: true
+      when: pg_ready.rc == 0
+
+    - name: "[pg-failover] Hiển thị trạng thái tất cả nodes"
+      debug:
+        msg: |
+          {{ inventory_hostname }} ({{ ansible_host }}):
+            Running : {{ 'YES' if pg_ready.rc == 0 else 'NO' }}
+            Role    : {{ 'REPLICA' if pg_role_check.stdout | default('') | trim == 't' else 'PRIMARY' }}
+
+- name: "🔀 [PG-FAILOVER] Promote {{ target_node }} lên primary"
+  hosts: monitoring_db
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: "[pg-failover] Chỉ thực hiện trên target_node"
+      when: inventory_hostname == target_node
+      block:
+        - name: "[pg-failover] Xác nhận đây là replica"
+          command: >
+            docker exec postgresql psql -U postgres -tAc "SELECT pg_is_in_recovery();"
+          register: is_replica
+
+        - name: "[pg-failover] Dừng nếu không phải replica"
+          fail:
+            msg: |
+              ❌ {{ inventory_hostname }} đang là PRIMARY (pg_is_in_recovery = f)
+              Không cần promote!
+          when: is_replica.stdout | trim != 't'
+
+        - name: "[pg-failover] Confirm promote"
+          pause:
+            prompt: |
+              ⚠️  Sắp promote {{ inventory_hostname }} ({{ ansible_host }}) lên PRIMARY.
+              Đảm bảo primary cũ ({{ groups['monitoring_db'][0] }}) đã DEAD hoàn toàn.
+              Bấm Enter để tiếp tục, Ctrl+C để hủy
+
+        - name: "[pg-failover] Promote"
+          command: >
+            docker exec postgresql pg_ctl promote -D /var/lib/postgresql/data
+          register: promote_result
+
+        - name: "[pg-failover] Chờ promote hoàn thành"
+          command: >
+            docker exec postgresql psql -U postgres -tAc "SELECT pg_is_in_recovery();"
+          register: check_promoted
+          retries: 15
+          delay: 3
+          until: check_promoted.stdout | trim == 'f'
+
+        - name: "[pg-failover] ✅ Promote thành công"
+          debug:
+            msg: |
+              ══════════════════════════════════════════════════════
+              ✅ {{ inventory_hostname }} đã là PRIMARY
+              ══════════════════════════════════════════════════════
+              Bước tiếp theo bắt buộc:
+              1. Sửa inventory/hosts.yml:
+                 {{ inventory_hostname }}: pg_role: primary
+                 (node cũ nếu recover): pg_role: replica
+              2. Sửa all.yml nếu cần:
+                 grafana_db_host: "{{ ansible_host }}"
+              3. Chạy: ./run.sh reconfig --tags postgresql,grafana
+              4. Kiểm tra: curl http://VIP/api/health
+              ══════════════════════════════════════════════════════

@@ -1,0 +1,192 @@
+server:
+  http_listen_port: {{ promtail_port }}
+  grpc_listen_port: 0
+
+# =============================================================================
+# Positions — nhớ vị trí đọc đến đâu (không đọc lại từ đầu sau restart)
+# =============================================================================
+positions:
+  filename: /var/lib/promtail/positions.yaml
+  sync_period: 10s
+
+# =============================================================================
+# Clients — đẩy log về Loki qua VIP (HAProxy)
+# Chỉ 1 endpoint — Loki tự replication nội bộ bằng memberlist
+# KHÔNG gửi trực tiếp vào từng node → tránh duplicate logs
+# =============================================================================
+clients:
+  - url: "http://{{ vip_address }}:{{ loki_port }}/loki/api/v1/push"
+    tenant_id: default
+    batchwait: 1s
+    batchsize: 1048576
+    timeout: 10s
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
+    external_labels:
+      host: "{{ inventory_hostname }}"
+      ip: "{{ ansible_host }}"
+      site: "{{ site | default('unknown') }}"
+      cluster: "{{ cluster | default('default') }}"
+      role: "{{ role | default('server') }}"
+      env: production
+
+# =============================================================================
+# Scrape configs — định nghĩa log sources
+# =============================================================================
+scrape_configs:
+
+  # ── Systemd Journal — tất cả service logs ──
+  - job_name: systemd
+    journal:
+      max_age: 12h
+      json: false
+      labels:
+        job: systemd
+        host: "{{ inventory_hostname }}"
+    relabel_configs:
+      - source_labels: [__journal__systemd_unit]
+        target_label: unit
+      - source_labels: [__journal__hostname]
+        target_label: hostname
+      - source_labels: [__journal_priority_keyword]
+        target_label: level
+    pipeline_stages:
+      - match:
+          selector: '{unit=~".*"}'
+          stages:
+            - multiline:
+                firstline: '^\w{3}\s+\d+\s+\d+:\d+:\d+'
+                max_wait_time: 3s
+
+  # ── /var/log/syslog hoặc /var/log/messages ──
+  - job_name: syslog
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: syslog
+          host: "{{ inventory_hostname }}"
+          __path__: /var/log/{syslog,messages}
+    pipeline_stages:
+      - regex:
+          expression: '(?P<timestamp>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(?P<hostname>\S+)\s+(?P<process>\S+?)(?:\[(?P<pid>\d+)\])?\s*:\s*(?P<message>.*)'
+      - labels:
+          hostname:
+          process:
+      - timestamp:
+          source: timestamp
+          format: "Jan  2 15:04:05"
+
+  # ── Kernel logs ──
+  - job_name: kern
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: kern
+          host: "{{ inventory_hostname }}"
+          __path__: /var/log/kern.log
+    pipeline_stages:
+      - regex:
+          expression: '(?P<level>warning|error|critical|emerg|alert|crit|err|warn)'
+      - labels:
+          level:
+
+  # ── Auth logs — SSH, sudo ──
+  - job_name: auth
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: auth
+          host: "{{ inventory_hostname }}"
+          __path__: /var/log/auth.log
+    pipeline_stages:
+      - regex:
+          expression: '(?P<action>Accepted|Failed|Invalid|sudo|session opened|session closed)'
+      - labels:
+          action:
+
+  # ── Docker container logs (nếu có Docker) ──
+{% if 'monitoring' in group_names %}
+  - job_name: docker
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: docker
+          host: "{{ inventory_hostname }}"
+          __path__: /var/lib/docker/containers/*/*-json.log
+    pipeline_stages:
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            time:   time
+            tag:    attrs.tag
+      - regex:
+          source: tag
+          expression: '(?P<container_name>[^/]+)$'
+      - labels:
+          stream:
+          container_name:
+      - output:
+          source: output
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+  # ── VictoriaMetrics logs ──
+  - job_name: victoriametrics
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: victoriametrics
+          host: "{{ inventory_hostname }}"
+          component: vmstorage
+          __path__: /var/lib/docker/containers/*/*-json.log
+    pipeline_stages:
+      - json:
+          expressions:
+            output: log
+            tag:    attrs.tag
+      - match:
+          selector: '{job="victoriametrics"}'
+          stages:
+            - regex:
+                source: output
+                expression: '(?P<level>error|warn|info|debug)'
+            - labels:
+                level:
+
+  # ── HAProxy logs ──
+  - job_name: haproxy
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: haproxy
+          host: "{{ inventory_hostname }}"
+          __path__: /var/log/haproxy.log
+    pipeline_stages:
+      - regex:
+          expression: '(?P<frontend>\S+)/(?P<backend>\S+)\s+.*\s+(?P<status_code>\d{3})\s'
+      - labels:
+          frontend:
+          backend:
+          status_code:
+{% endif %}
+
+  # ── Ceph logs (nếu là ceph node) ──
+{% if 'ceph' in group_names or inventory_hostname in (groups['ceph_dbp3'] | default([])) %}
+  - job_name: ceph
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: ceph
+          host: "{{ inventory_hostname }}"
+          cluster: "{{ cluster | default('ceph') }}"
+          __path__: /var/log/ceph/*.log
+    pipeline_stages:
+      - regex:
+          expression: '(?P<level>error|warn|info|debug)'
+      - labels:
+          level:
+{% endif %}

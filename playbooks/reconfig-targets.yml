@@ -1,0 +1,93 @@
+---
+# playbooks/reconfig-targets.yml
+# =============================================================================
+# Cập nhật scrape targets từ thư mục targets/
+# Chỉ cần sửa file targets/*.yml → chạy lệnh này → vmagent tự reload
+# KHÔNG đọc từ inventory — inventory chỉ dùng cho infrastructure
+# =============================================================================
+
+- name: "🎯 [RECONFIG] Cập nhật scrape targets"
+  hosts: "{{ target_nodes | default(groups['monitoring'][:2]) }}"
+  become: true
+  gather_facts: false
+  tags: [reconfig, targets]
+
+  pre_tasks:
+    - name: "[targets] Tổng kết targets sẽ được apply"
+      run_once: true
+      block:
+        - name: "[targets] Đọc danh sách targets"
+          set_fact:
+            ne_data:     "{{ lookup('file', playbook_dir + '/../targets/node_exporter.yml') | from_yaml }}"
+            ceph_data:   "{{ lookup('file', playbook_dir + '/../targets/ceph.yml') | from_yaml }}"
+            os_data:     "{{ lookup('file', playbook_dir + '/../targets/openstack.yml') | from_yaml }}"
+            vm_data:     "{{ lookup('file', playbook_dir + '/../targets/vmware.yml') | from_yaml }}"
+            custom_data: "{{ lookup('file', playbook_dir + '/../targets/custom.yml') | from_yaml }}"
+
+        - name: "[targets] Đếm số lượng targets"
+          set_fact:
+            ne_count:     "{{ ne_data.groups | map(attribute='hosts') | flatten | length }}"
+            ceph_count:   "{{ ceph_data.groups | map(attribute='hosts') | flatten | length }}"
+            os_count:     "{{ os_data.groups | map(attribute='hosts') | flatten | length }}"
+            vm_count:     "{{ vm_data.groups | select('ne', []) | map(attribute='hosts') | flatten | length }}"
+            custom_count: "{{ custom_data.groups | select('ne', []) | map(attribute='hosts') | flatten | length }}"
+
+        - name: "[targets] Hiển thị tổng quan"
+          debug:
+            msg: |
+              ══════════════════════════════════════════════════════════════
+              SCRAPE TARGETS SẼ ĐƯỢC APPLY:
+              ══════════════════════════════════════════════════════════════
+              node_exporter  : {{ ne_count }} targets
+              ceph           : {{ ceph_count }} targets
+              openstack      : {{ os_count }} targets
+              vmware         : {{ vm_count }} targets
+              custom         : {{ custom_count }} targets
+              ──────────────────────────────────────────────────────────────
+              Tổng           : {{ ne_count|int + ceph_count|int + os_count|int + vm_count|int + custom_count|int }} targets
+              Apply trên     : {{ ansible_play_hosts | join(', ') }}
+              ══════════════════════════════════════════════════════════════
+
+  tasks:
+    - name: "[targets] Tạo thư mục vmagent"
+      file:
+        path: "{{ monitoring_base_dir }}/vmagent"
+        state: directory
+        mode: '0755'
+
+    - name: "[targets] Generate scrape.yml từ targets/*.yml"
+      template:
+        src: "{{ playbook_dir }}/../templates/vmagent-scrape.yml.j2"
+        dest: "{{ monitoring_base_dir }}/vmagent/scrape.yml"
+        backup: true
+        mode: '0644'
+      register: scrape_updated
+
+    - name: "[targets] Reload vmagent (SIGHUP — không restart)"
+      shell: |
+        docker kill --signal=SIGHUP vmagent 2>/dev/null && echo "SIGHUP sent" \
+        || docker restart vmagent && echo "restarted"
+      register: reload_result
+      when: scrape_updated.changed
+
+    - name: "[targets] Chờ vmagent load config mới"
+      pause:
+        seconds: 5
+      when: scrape_updated.changed
+
+    - name: "[targets] Verify — kiểm tra số targets active"
+      uri:
+        url: "http://{{ ansible_host }}:{{ vmagent_port }}/api/v1/targets"
+        method: GET
+        status_code: 200
+        return_content: true
+      register: targets_api
+      ignore_errors: true
+
+    - name: "[targets] ✅ Kết quả trên {{ inventory_hostname }}"
+      debug:
+        msg: |
+          {{ inventory_hostname }}:
+            Config updated : {{ scrape_updated.changed }}
+            Reload status  : {{ reload_result.stdout | default('skipped') }}
+            Active targets : {{ (targets_api.json.data.activeTargets | default([]) | length) if targets_api.status == 200 else 'N/A' }}
