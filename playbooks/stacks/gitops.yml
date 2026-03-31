@@ -1,0 +1,11 @@
+---
+# playbooks/stacks/gitops.yml
+# Deploy GitOps stack: gitea
+# v6.0 — Stack-based deployment
+
+- name: "🦊 [gitops/01] Gitea + Ansible Runner — monitoring_gitea"
+  hosts: monitoring_gitea
+  become: true
+  gather_facts: false
+  tags: [gitea, gitops]
+  roles: [gitea]

@@ -1,0 +1,7 @@
+type: S3
+config:
+  bucket: {{ s3_bucket_thanos }}
+  endpoint: {{ s3_endpoint | replace('https://', '') }}
+  access_key: {{ s3_access_key }}
+  secret_key: {{ s3_secret_key }}
+  insecure: false

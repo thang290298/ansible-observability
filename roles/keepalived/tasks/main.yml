@@ -2,14 +2,14 @@
 # roles/keepalived/tasks/main.yml
 
 - name: "[keepalived] Cài đặt keepalived"
-  package:
+  ansible.builtin.package:
     name: keepalived
     state: present
   become: true
   tags: [keepalived]
 
 - name: "[keepalived] Generate cấu hình"
-  template:
+  ansible.builtin.template:
     src: keepalived.conf.j2
     dest: /etc/keepalived/keepalived.conf
     backup: true
@@ -18,7 +18,7 @@
   tags: [keepalived]
 
 - name: "[keepalived] Enable và start service"
-  service:
+  ansible.builtin.service:
     name: keepalived
     state: started
     enabled: true
@@ -26,7 +26,7 @@
   tags: [keepalived]
 
 - name: "[keepalived] Verify VIP trên MASTER node"
-  shell: ip addr show | grep "{{ vip_address }}"
+  ansible.builtin.shell: ip addr show | grep "{{ vip_address }}"
   register: vip_result
   changed_when: false
   failed_when: false
@@ -34,8 +34,7 @@
   tags: [keepalived, verify]
 
 - name: "[keepalived] ✅ VIP status"
-  debug:
+  ansible.builtin.debug:
     msg: "VIP {{ vip_address }} {{ 'ACTIVE ✅' if (vip_result.rc | default(1)) == 0 else 'NOT YET (waiting for election)' }} on {{ inventory_hostname }}"
   when: groups['monitoring_lb'].index(inventory_hostname) == 0
   tags: [keepalived, verify]
-

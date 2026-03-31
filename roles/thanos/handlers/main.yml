@@ -1,0 +1,16 @@
+---
+# roles/thanos/handlers/main.yml
+- name: Restart thanos-receive
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/thanos-receive"
+    state: restarted
+
+- name: Restart thanos-store
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/thanos-store"
+    state: restarted
+
+- name: Restart thanos-query
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/thanos-query"
+    state: restarted

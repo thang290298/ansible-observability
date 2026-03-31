@@ -1,0 +1,65 @@
+---
+# =============================================================================
+# inventory/site-dbp4.yml
+# Site DBP4 — Di An Business Park 4
+#
+# Cấu trúc group trong site:
+#   site_dbp4              Parent group toàn bộ site
+#   ├── ceph_dbp4          Ceph storage cluster
+#   ├── compute_dbp4       Compute nodes (KVM/libvirt)
+#   └── controller_dbp4    OpenStack controller nodes
+#
+# Thêm server mới:
+#   1. Thêm host vào group phù hợp bên dưới
+#   2. Tạo file inventory/host_vars/<hostname>.yml (nếu có meta info)
+#   3. Chạy: ./run.sh node-exporter --limit <hostname>
+# =============================================================================
+
+site_dbp4:
+  vars:
+    site: dbp4
+    # Group vars chung cho toàn site — override tại group_vars/site_dbp4.yml
+
+  children:
+
+    # --------------------------------------------------------------------------
+    # Ceph Storage Cluster — DBP4
+    # Exporters: ceph-exporter (port 9283)
+    # --------------------------------------------------------------------------
+    ceph_dbp4:
+      vars:
+        role: ceph
+        cluster: ceph-dbp4
+        ceph_exporter_port: 9283
+      hosts:
+        cephssd01-dbp4: { ansible_host: 10.167.52.81 }
+        # cephssd02-dbp4: { ansible_host: 10.167.52.82 }
+        # cephssd03-dbp4: { ansible_host: 10.167.52.83 }
+
+    # --------------------------------------------------------------------------
+    # Compute Nodes — DBP4
+    # Exporters: node_exporter (9100), libvirt (9177)
+    # --------------------------------------------------------------------------
+    compute_dbp4:
+      vars:
+        role: compute
+        cluster: openstack-dbp4
+        libvirt_exporter_port: 9177
+      hosts:
+        compute01-dbp4: { ansible_host: 10.167.50.21 }
+        # compute02-dbp4: { ansible_host: 10.167.50.22 }
+        # compute03-dbp4: { ansible_host: 10.167.50.23 }
+
+    # --------------------------------------------------------------------------
+    # Controller Nodes — DBP4
+    # Exporters: node_exporter (9100), openstack-exporter (9180)
+    # --------------------------------------------------------------------------
+    controller_dbp4:
+      vars:
+        role: controller
+        cluster: openstack-dbp4
+        openstack_exporter_port: 9180
+      hosts:
+        controller01-dbp4: { ansible_host: 10.167.50.10 }
+        # controller02-dbp4: { ansible_host: 10.167.50.11 }
+        # controller03-dbp4: { ansible_host: 10.167.50.12 }

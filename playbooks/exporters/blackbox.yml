@@ -1,0 +1,11 @@
+---
+# playbooks/exporters/blackbox.yml
+# Deploy blackbox exporter + random_ping
+# v6.0 — Exporter-based deployment
+
+- name: "🔍 [exporters] Blackbox + Random Ping — monitoring_lb"
+  hosts: monitoring_lb
+  become: true
+  gather_facts: false
+  tags: [blackbox, random_ping, exporters]
+  roles: [random_ping]

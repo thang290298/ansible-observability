@@ -1,0 +1,78 @@
+---
+# roles/gen_config_vmagent/tasks/main.yml
+# =============================================================================
+# Generate vmagent scrape configs từ inventory
+# Chạy trên: monitoring_vmagent (localhost delegate)
+# =============================================================================
+
+- name: "[gen_config] Hiển thị thông tin"
+  ansible.builtin.debug:
+    msg: |
+      ══════════════════════════════════════════════════════════════
+      GEN CONFIG VMAGENT — Generate scrape configs from inventory
+      Output dir  : {{ gen_config_output_dir }}
+      Node groups : {{ node_groups | join(', ') | default('(none)') }}
+      Ceph groups : {{ ceph_groups | join(', ') | default('(none)') }}
+      OS groups   : {{ openstack_groups | join(', ') | default('(none)') }}
+      Libvirt groups: {{ libvirt_groups | join(', ') | default('(none)') }}
+      Blackbox groups: {{ blackbox_groups | join(', ') | default('(none)') }}
+      ══════════════════════════════════════════════════════════════
+  run_once: true
+  tags: [gen_config, always]
+
+- name: "[gen_config] Tạo thư mục scrape_configs"
+  ansible.builtin.file:
+    path: "{{ gen_config_output_dir }}"
+    state: directory
+    mode: "0755"
+    owner: "{{ gen_config_file_owner }}"
+    group: "{{ gen_config_file_group }}"
+  tags: [gen_config]
+
+# ── Node exporter scrape configs ──────────────────────────────────────────
+- name: "[gen_config] Gen scrape config — node_exporter"
+  ansible.builtin.include_tasks: node.yml
+  when: node_groups | length > 0
+  tags: [gen_config, node]
+
+# ── Ceph scrape configs ───────────────────────────────────────────────────
+- name: "[gen_config] Gen scrape config — ceph"
+  ansible.builtin.include_tasks: ceph.yml
+  when: ceph_groups | length > 0
+  tags: [gen_config, ceph]
+
+# ── OpenStack scrape configs ──────────────────────────────────────────────
+- name: "[gen_config] Gen scrape config — openstack"
+  ansible.builtin.include_tasks: openstack.yml
+  when: openstack_groups | length > 0
+  tags: [gen_config, openstack]
+
+# ── Libvirt scrape configs ────────────────────────────────────────────────
+- name: "[gen_config] Gen scrape config — libvirt"
+  ansible.builtin.include_tasks: libvirt.yml
+  when: libvirt_groups | length > 0
+  tags: [gen_config, libvirt]
+
+# ── Blackbox scrape configs ───────────────────────────────────────────────
+- name: "[gen_config] Gen scrape config — blackbox"
+  ansible.builtin.include_tasks: blackbox.yml
+  when: blackbox_groups | length > 0
+  tags: [gen_config, blackbox]
+
+# ── Reload vmagent ────────────────────────────────────────────────────────
+- name: "[gen_config] Reload vmagent (SIGHUP — không restart)"
+  ansible.builtin.shell: |
+    docker kill --signal=SIGHUP vmagent 2>/dev/null && echo "SIGHUP sent" \
+    || echo "vmagent container not found — skipping reload"
+  register: reload_result
+  changed_when: "'SIGHUP sent' in reload_result.stdout"
+  when: gen_config_reload_vmagent | bool
+  run_once: true
+  tags: [gen_config, reload]
+
+- name: "[gen_config] ✅ vmagent reload status"
+  ansible.builtin.debug:
+    msg: "{{ reload_result.stdout | default('reload skipped') }}"
+  run_once: true
+  when: gen_config_reload_vmagent | bool
+  tags: [gen_config]

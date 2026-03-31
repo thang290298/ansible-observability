@@ -1,21 +1,8 @@
-﻿---
+---
 # roles/promtail/tasks/main.yml
-# Cài Promtail trên TẤT CẢ servers (exporters + monitoring nodes)
-# Thu thập logs và đẩy về Loki cluster
 
-- name: "[promtail] Hiển thị thông tin"
-  debug:
-    msg: |
-      ══════════════════════════════════════════
-      Deploying Promtail {{ loki_version }}
-      Node        : {{ inventory_hostname }} ({{ ansible_host }})
-      HTTP port   : {{ promtail_port }}
-      Loki URLs   : {{ loki_push_urls | join(', ') }}
-      Log paths   : systemd journal + /var/log/*.log
-      ══════════════════════════════════════════
-
-- name: "[promtail] Tạo thư mục"
-  file:
+- name: "[promtail] Tao thu muc"
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: '0755'
@@ -23,47 +10,44 @@
     - /etc/promtail
     - /var/lib/promtail
 
+- name: "[promtail] Check if promtail binary exists"
+  ansible.builtin.stat:
+    path: /usr/local/bin/promtail
+  register: promtail_binary
+
+- name: "[promtail] Install unzip"
+  ansible.builtin.apt:
+    name: unzip
+    state: present
+  when: not promtail_binary.stat.exists
+
 - name: "[promtail] Download Promtail binary"
-  get_url:
-    url: "https://github.com/grafana/loki/releases/download/{{ loki_version }}/promtail-linux-amd64.zip"
-    dest: "/tmp/promtail-linux-amd64.zip"
-    mode: '0644'
-  register: promtail_downloaded
+  ansible.builtin.shell: |
+    curl -L -o /tmp/promtail-linux-amd64.zip \
+      "https://github.com/grafana/loki/releases/download/v{{ loki_version }}/promtail-linux-amd64.zip"
+  args:
+    creates: /usr/local/bin/promtail
+  when: not promtail_binary.stat.exists
 
-- name: "[promtail] Extract binary"
-  unarchive:
-    src: /tmp/promtail-linux-amd64.zip
-    dest: /usr/local/bin/
-    remote_src: true
-    mode: '0755'
-  when: promtail_downloaded.changed
-
-# [FIX M3] Dùng stat + copy thay vì shell mv để idempotent
-- name: "[promtail] Check extracted binary name"
-  stat:
-    path: /usr/local/bin/promtail-linux-amd64
-  register: promtail_bin_stat
-  when: promtail_downloaded.changed
-
-- name: "[promtail] Install binary (rename to promtail)"
-  copy:
-    src: /usr/local/bin/promtail-linux-amd64
-    dest: /usr/local/bin/promtail
-    mode: '0755'
-    remote_src: true
-  become: true
-  when: promtail_downloaded.changed and promtail_bin_stat.stat.exists | default(false)
+- name: "[promtail] Extract and install binary"
+  ansible.builtin.shell: |
+    cd /tmp && unzip -o promtail-linux-amd64.zip && \
+    chmod +x promtail-linux-amd64 && \
+    mv promtail-linux-amd64 /usr/local/bin/promtail
+  args:
+    creates: /usr/local/bin/promtail
+  when: not promtail_binary.stat.exists
   notify: Restart promtail
 
 - name: "[promtail] Generate config"
-  template:
+  ansible.builtin.template:
     src: promtail-config.yml.j2
     dest: /etc/promtail/config.yml
     backup: true
   notify: Restart promtail
 
-- name: "[promtail] Tạo systemd service"
-  template:
+- name: "[promtail] Tao systemd service"
+  ansible.builtin.template:
     src: promtail.service.j2
     dest: /etc/systemd/system/promtail.service
     mode: '0644'
@@ -71,21 +55,21 @@
     - Reload systemd
     - Restart promtail
 
-- name: "[promtail] Enable và start Promtail"
-  systemd:
+- name: "[promtail] Enable va start Promtail"
+  ansible.builtin.systemd:
     name: promtail
     enabled: true
     state: started
     daemon_reload: true
 
 - name: "[promtail] Verify Promtail running"
-  uri:
+  ansible.builtin.uri:
     url: "http://localhost:{{ promtail_port }}/ready"
     status_code: 200
-  retries: 10
+  ignore_errors: true
+  retries: 5
   delay: 3
 
-- name: "[promtail] ✅ Promtail OK trên {{ inventory_hostname }}"
-  debug:
+- name: "[promtail] Promtail OK tren {{ inventory_hostname }}"
+  ansible.builtin.debug:
     msg: "Promtail sending logs to Loki: {{ loki_push_urls }}"
-

@@ -1,4 +1,3 @@
-version: "3.8"
 
 # =============================================================================
 # Loki — Log aggregation
@@ -18,8 +17,11 @@ services:
       - ./config.yml:/etc/loki/config.yml:ro
       - {{ loki_data_path }}:/loki          # mount toàn bộ: WAL + cache đều nằm đây
     ports:
-      - "{{ loki_port }}:{{ loki_port }}"
+      - "{{ loki_internal_port | default(loki_port) }}:{{ loki_port }}"
       - "{{ loki_grpc_port }}:{{ loki_grpc_port }}"
+      - "{{ loki_memberlist_port }}:{{ loki_memberlist_port }}"
+    mem_limit: "{{ loki_mem_limit | default('2g') }}"
+    cpus: "{{ loki_cpu_limit | default('1.5') }}"
     labels:
       monitoring: "true"
       component: "loki"
@@ -28,8 +30,3 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:{{ loki_port }}/ready || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5

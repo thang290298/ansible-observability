@@ -1,0 +1,11 @@
+services:
+  blackbox-random-ping:
+    image: prom/blackbox-exporter:{{ blackbox_version | default('latest') }}
+    container_name: blackbox-random-ping
+    restart: unless-stopped
+    ports:
+      - "9116:9115"
+    volumes:
+      - ./config/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    command:
+      - "--config.file=/etc/blackbox_exporter/config.yml"

@@ -1,0 +1,8 @@
+---
+# roles/gen_config_vmagent/handlers/main.yml
+- name: Reload vmagent
+  ansible.builtin.uri:
+    url: "http://localhost:{{ vmagent_port }}/-/reload"
+    method: GET
+    status_code: [200, 204]
+  ignore_errors: true

@@ -1,0 +1,10 @@
+---
+# playbooks/reconfig/exporters.yml
+# Reload scrape targets (vmagent SIGHUP — no downtime)
+# v6.0 — Stack reconfig
+#
+# Fix C2: import_playbook "../reconfig-targets.yml" không tồn tại.
+# Reload scrape targets = reload vmagent config → dùng reconfig/monitoring.yml
+# (monitoring.yml xử lý: regenerate scrape.yml + SIGHUP vmagent)
+
+- import_playbook: monitoring.yml

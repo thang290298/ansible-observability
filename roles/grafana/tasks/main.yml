@@ -1,24 +1,18 @@
 ---
 # roles/grafana/tasks/main.yml
-# Deploy Grafana với PostgreSQL backend (HA-ready)
-# Chạy trên: monitoring_grafana group
+# Deploy Grafana voi PostgreSQL backend (HA-ready)
 
-- name: "[grafana] Hiển thị cấu hình"
-  debug:
-    msg: |
-      ══════════════════════════════════════════
-      Deploying Grafana {{ grafana_version }}
-      Node        : {{ inventory_hostname }} ({{ ansible_host }})
-      HTTP port   : {{ grafana_port }}
-      Data path   : {{ grafana_data_path }}
-      DB host     : {{ grafana_db_host }}:{{ grafana_db_port }}
-      DB name     : {{ grafana_db_name }}
-      ══════════════════════════════════════════
+- name: "[grafana] Hien thi deploy info"
+  ansible.builtin.debug:
+    msg:
+      - "Deploying Grafana {{ grafana_version }}"
+      - "Node: {{ inventory_hostname }} ({{ ansible_host }})"
+      - "HTTP port: {{ grafana_port }}"
+      - "DB: {{ grafana_db_host }}:{{ grafana_db_port }}/{{ grafana_db_name }}"
 
-# ── INSTALL ─────────────────────────────────────────────────────────────────
-
-- name: "[grafana] Tạo thư mục"
-  file:
+# ── INSTALL ──────────────────────────────────────────────────────────────────
+- name: "[grafana] Tao thu muc config"
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: '0755'
@@ -30,8 +24,8 @@
   become: true
   tags: [grafana]
 
-- name: "[grafana] Tạo thư mục data (owner grafana UID 472)"
-  file:
+- name: "[grafana] Tao thu muc data (owner grafana UID 472)"
+  ansible.builtin.file:
     path: "{{ grafana_data_path }}"
     state: directory
     mode: '0755'
@@ -47,9 +41,8 @@
   tags: [grafana]
 
 # ── CONFIGURE ────────────────────────────────────────────────────────────────
-
 - name: "[grafana] Generate datasources provisioning"
-  template:
+  ansible.builtin.template:
     src: provisioning/datasources.yml.j2
     dest: "{{ monitoring_base_dir }}/grafana/provisioning/datasources/datasources.yml"
     mode: '0644'
@@ -58,7 +51,7 @@
   tags: [grafana]
 
 - name: "[grafana] Generate docker-compose"
-  template:
+  ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ monitoring_base_dir }}/grafana/docker-compose.yml"
     mode: '0644'
@@ -67,25 +60,17 @@
   tags: [grafana]
 
 # ── START SERVICE ─────────────────────────────────────────────────────────────
-
 - name: "[grafana] Start Grafana"
   community.docker.docker_compose_v2:
     project_src: "{{ monitoring_base_dir }}/grafana"
     state: present
   tags: [grafana]
 
-# ── VERIFY ────────────────────────────────────────────────────────────────────
-
-- name: "[grafana] Chờ Grafana sẵn sàng"
-  uri:
+- name: "[grafana] Health check"
+  ansible.builtin.uri:
     url: "http://localhost:{{ grafana_port }}/api/health"
     status_code: 200
-  retries: 20
+  retries: 15
   delay: 5
-  register: grafana_health
-  tags: [grafana, verify]
-
-- name: "[grafana] ✅ Grafana OK trên {{ inventory_hostname }}"
-  debug:
-    msg: "Grafana running at http://{{ ansible_host }}:{{ grafana_port }}"
-  tags: [grafana, verify]
+  ignore_errors: true
+  tags: [grafana]

@@ -1,0 +1,34 @@
+---
+# roles/gen_config_vmagent/tasks/node.yml
+# =============================================================================
+# Gen scrape_node_<site>.yml cho từng group trong node_groups
+# Pattern: loop qua node_groups → tìm site từ host_vars → gen file riêng per site
+# =============================================================================
+
+- name: "[gen_config/node] Gen scrape config cho từng node group"
+  vars:
+    # Tìm site từ host đầu tiên trong group (tất cả host trong 1 group cùng site)
+    _first_host: "{{ groups[target_group][0] }}"
+    _site: "{{ hostvars[_first_host].meta.site | default(hostvars[_first_host].site | default(target_group)) }}"
+    _output_file: "{{ gen_config_output_dir }}/scrape_node_{{ _site }}.yml"
+  ansible.builtin.template:
+    src: scrape_node.yml.j2
+    dest: "{{ _output_file }}"
+    owner: "{{ gen_config_file_owner }}"
+    group: "{{ gen_config_file_group }}"
+    mode: "{{ gen_config_file_mode }}"
+    backup: true
+  loop: "{{ node_groups }}"
+  loop_control:
+    loop_var: target_group
+    label: "{{ target_group }} → scrape_node_{{ hostvars[groups[target_group][0]].meta.site | default(target_group) }}.yml"
+  when:
+    - groups[target_group] is defined
+    - groups[target_group] | length > 0
+  register: node_config_result
+  tags: [gen_config, node]
+
+- name: "[gen_config/node] ✅ Node scrape configs generated"
+  ansible.builtin.debug:
+    msg: "Generated {{ node_config_result.results | selectattr('changed') | list | length }} / {{ node_groups | length }} node scrape files"
+  tags: [gen_config, node]

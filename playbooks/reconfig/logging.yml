@@ -1,0 +1,60 @@
+---
+# playbooks/reconfig/logging.yml
+# Reload Loki + Promtail config (no downtime)
+# v6.0 — Stack reconfig
+
+- name: "📋 [reconfig/logging] Reload Loki config"
+  hosts: "{{ target_nodes | default(groups['monitoring_loki']) }}"
+  become: true
+  gather_facts: false
+  tags: [reconfig, loki, logging]
+
+  tasks:
+    - name: "[reconfig/loki] Regenerate Loki config"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../roles/loki/templates/loki-config.yml.j2"
+        dest: "{{ monitoring_base_dir }}/loki/config.yml"
+        backup: true
+      register: loki_config_updated
+
+    - name: "[reconfig/loki] Restart Loki nếu config thay đổi"
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_base_dir }}/loki"
+        state: present
+        restarted: "{{ loki_config_updated.changed }}"
+
+    - name: "[reconfig/loki] Chờ Loki sẵn sàng"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ loki_port }}/ready"
+        status_code: 200
+      retries: 15
+      delay: 5
+      when: loki_config_updated.changed
+
+    - name: "[reconfig/loki] ✅ Loki status"
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: Loki {{ 'restarted' if loki_config_updated.changed else 'unchanged' }}"
+
+- name: "🪵 [reconfig/logging] Reload Promtail config"
+  hosts: "{{ target_nodes | default(groups['promtail_nodes']) }}"
+  become: true
+  gather_facts: false
+  tags: [reconfig, promtail, logging]
+
+  tasks:
+    - name: "[reconfig/promtail] Regenerate Promtail config"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../roles/promtail/templates/promtail-config.yml.j2"
+        dest: /etc/promtail/config.yml
+        backup: true
+      register: promtail_config_updated
+
+    - name: "[reconfig/promtail] Reload Promtail (graceful)"
+      ansible.builtin.systemd:
+        name: promtail
+        state: restarted
+      when: promtail_config_updated.changed
+
+    - name: "[reconfig/promtail] ✅ Promtail status"
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: Promtail {{ 'restarted' if promtail_config_updated.changed else 'unchanged' }}"

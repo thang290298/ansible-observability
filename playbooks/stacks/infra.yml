@@ -1,0 +1,32 @@
+---
+# playbooks/stacks/infra.yml
+# Deploy Infrastructure stack: common → docker → keepalived → haproxy
+# v6.0 — Stack-based deployment
+
+- name: "📦 [infra/01] OS cơ bản — tất cả nodes"
+  hosts: all
+  become: true
+  gather_facts: true
+  tags: [common]
+  roles: [common]
+
+- name: "🐳 [infra/02] Docker — tất cả monitoring nodes"
+  hosts: monitoring
+  become: true
+  gather_facts: true
+  tags: [docker]
+  roles: [docker]
+
+- name: "🔀 [infra/03] Keepalived — monitoring_lb"
+  hosts: monitoring_lb
+  become: true
+  gather_facts: false
+  tags: [keepalived, lb]
+  roles: [keepalived]
+
+- name: "⚖️  [infra/04] HAProxy — monitoring_lb"
+  hosts: monitoring_lb
+  become: true
+  gather_facts: false
+  tags: [haproxy, lb]
+  roles: [haproxy]

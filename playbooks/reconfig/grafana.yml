@@ -1,0 +1,36 @@
+---
+# playbooks/reconfig/grafana.yml
+# Reload Grafana datasources (no downtime)
+# v6.0 — Stack reconfig
+
+- name: "📊 [reconfig/grafana] Reload Grafana datasources"
+  hosts: "{{ target_nodes | default(groups['monitoring_grafana']) }}"
+  become: true
+  gather_facts: false
+  tags: [reconfig, grafana]
+
+  tasks:
+    - name: "[reconfig/grafana] Regenerate Grafana config"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../roles/grafana/templates/docker-compose.yml.j2"
+        dest: "{{ monitoring_base_dir }}/grafana/docker-compose.yml"
+        backup: true
+      register: grafana_config_updated
+
+    - name: "[reconfig/grafana] Restart Grafana nếu config thay đổi"
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_base_dir }}/grafana"
+        state: present
+        restarted: "{{ grafana_config_updated.changed }}"
+
+    - name: "[reconfig/grafana] Chờ Grafana sẵn sàng"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ grafana_port }}/api/health"
+        status_code: 200
+      retries: 10
+      delay: 5
+      when: grafana_config_updated.changed
+
+    - name: "[reconfig/grafana] ✅ Grafana status"
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: Grafana {{ 'restarted' if grafana_config_updated.changed else 'unchanged' }}"

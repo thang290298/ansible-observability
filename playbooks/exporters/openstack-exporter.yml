@@ -1,0 +1,27 @@
+---
+# playbooks/exporters/openstack-exporter.yml
+# Deploy OpenStack exporter lên controller nodes
+#
+# PLACEHOLDER: Role 'openstack_exporter' chưa được implement
+# TODO: Tạo role roles/openstack_exporter/ với:
+#   - Download openstack-exporter binary
+#   - Cấu hình clouds.yaml
+#   - Systemd service chạy với user riêng
+#   - Port: {{ openstack_exporter_port }} (default: 9180)
+#
+# Cách dùng:
+#   ansible-playbook playbooks/exporters/openstack-exporter.yml --limit controller_ntl4
+#   ansible-playbook playbooks/exporters/openstack-exporter.yml --limit site_dbp3
+#   ansible-playbook playbooks/exporters/openstack-exporter.yml -e "target_group=controller_ntl4"
+
+- name: "Deploy OpenStack Exporter"
+  hosts: "{{ target_group | default('all') }}"
+  become: true
+  gather_facts: false
+  tags: [openstack-exporter]
+  tasks:
+    - name: "PLACEHOLDER — openstack_exporter role chưa được implement"
+      ansible.builtin.debug:
+        msg: >
+          Role 'openstack_exporter' chưa được tạo.
+          Xem TODO trong file playbooks/exporters/openstack-exporter.yml

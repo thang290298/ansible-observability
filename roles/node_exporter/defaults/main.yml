@@ -1,4 +1,7 @@
-﻿---
+---
 # roles/node_exporter/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+node_exporter_version: "1.8.2"
+node_exporter_port: 9100
+node_exporter_data_path: "/var/lib/node_exporter/textfile_collector"

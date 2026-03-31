@@ -1,0 +1,11 @@
+thanos_version: "v0.37.2"
+thanos_receive_http_port: 19291
+thanos_receive_grpc_port: 10907
+thanos_receive_replication_factor: 2
+thanos_store_http_port: 10906
+thanos_store_grpc_port: 10905
+thanos_query_http_port: 10902
+thanos_query_grpc_port: 10901
+thanos_data_path: "/data/thanos"
+thanos_receive_data_path: "/data/thanos/receive"
+thanos_store_data_path: "/data/thanos/store"

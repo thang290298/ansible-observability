@@ -1,0 +1,29 @@
+# thanos-query — PromQL federation over StoreAPI
+# Node: {{ inventory_hostname }} ({{ ansible_host }})
+
+services:
+  thanos-query:
+    image: quay.io/thanos/thanos:{{ thanos_version }}
+    container_name: thanos-query
+    restart: unless-stopped
+    command:
+      - query
+      - --grpc-address=0.0.0.0:{{ thanos_query_grpc_port }}
+      - --http-address=0.0.0.0:{{ thanos_query_http_port }}
+      - --query.replica-label=receive_replica
+{% for host in groups['monitoring_thanos_receive'] %}
+      - --store={{ hostvars[host]['ansible_host'] }}:{{ thanos_receive_grpc_port }}
+{% endfor %}
+      - --store={{ ansible_host }}:{{ thanos_store_grpc_port }}
+    ports:
+      - "127.0.0.1:{{ thanos_query_http_port_internal | default(10912) }}:{{ thanos_query_http_port }}"
+      - "{{ thanos_query_grpc_port }}:{{ thanos_query_grpc_port }}"
+    mem_limit: "512m"
+    labels:
+      monitoring: "true"
+      component: "thanos-query"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

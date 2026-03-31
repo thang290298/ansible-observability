@@ -1,0 +1,29 @@
+# thanos-store — Read từ S3, expose StoreAPI
+# Node: {{ inventory_hostname }} ({{ ansible_host }})
+
+services:
+  thanos-store:
+    image: quay.io/thanos/thanos:{{ thanos_version }}
+    container_name: thanos-store
+    restart: unless-stopped
+    command:
+      - store
+      - --grpc-address=0.0.0.0:{{ thanos_store_grpc_port }}
+      - --http-address=0.0.0.0:{{ thanos_store_http_port }}
+      - --data-dir=/thanos-store
+      - --objstore.config-file=/etc/thanos/objstore.yml
+    volumes:
+      - {{ thanos_store_data_path }}:/thanos-store
+      - ./objstore.yml:/etc/thanos/objstore.yml:ro
+    ports:
+      - "{{ thanos_store_http_port }}:{{ thanos_store_http_port }}"
+      - "{{ thanos_store_grpc_port }}:{{ thanos_store_grpc_port }}"
+    mem_limit: "1g"
+    labels:
+      monitoring: "true"
+      component: "thanos-store"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

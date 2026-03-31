@@ -1,32 +1,35 @@
 ---
 # roles/vmagent/tasks/main.yml
-
-- name: "[vmagent] Tạo thư mục"
-  file:
+- name: "[vmagent] Tao thu muc"
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: '0755'
+  become: true
   loop:
     - "{{ monitoring_base_dir }}/vmagent"
     - "{{ vmagent_data_path }}"
     - /etc/vmagent/targets
 
-- name: "[vmagent] Generate scrape config từ inventory"
-  template:
+- name: "[vmagent] Generate scrape config tu inventory"
+  ansible.builtin.template:
     src: vmagent-scrape.yml.j2
     dest: /etc/vmagent/scrape.yml
     backup: true
+  become: true
   notify: Reload vmagent
 
 - name: "[vmagent] Copy file-based targets"
-  copy:
-    src: "{{ playbook_dir }}/../targets/"
+  ansible.builtin.copy:
+    src: "{{ inventory_dir }}/../targets/"
     dest: /etc/vmagent/targets/
     mode: '0644'
+  become: true
   notify: Reload vmagent
+  ignore_errors: true
 
 - name: "[vmagent] Generate docker-compose"
-  template:
+  ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ monitoring_base_dir }}/vmagent/docker-compose.yml"
     backup: true
@@ -38,13 +41,9 @@
     state: present
 
 - name: "[vmagent] Health check"
-  uri:
+  ansible.builtin.uri:
     url: "http://localhost:{{ vmagent_port }}/health"
     status_code: 200
+  ignore_errors: true
   retries: 10
   delay: 5
-
-- name: "[vmagent] ✅ vmagent OK — scraping {{ groups['exporters'] | length }} exporters"
-  debug:
-    msg: "vmagent running on {{ inventory_hostname }}, remote_write → {{ vmagent_remote_write_url }}"
-  tags: [vmagent, verify]

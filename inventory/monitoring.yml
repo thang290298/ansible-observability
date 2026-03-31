@@ -1,0 +1,144 @@
+---
+# =============================================================================
+# inventory/monitoring.yml
+# Cụm hạ tầng giám sát — 3 nodes HA
+#
+# Cấu trúc:
+#   monitoring_all   → Define hosts + connection info (1 lần duy nhất)
+#   monitoring_lb    → HAProxy + Keepalived
+#   monitoring_storage → vmstorage
+#   monitoring_insert  → vminsert
+#   monitoring_query   → vmselect
+#   monitoring_vmagent → vmagent (scrape metrics)
+#   monitoring_alertmanager → Alertmanager cluster
+#   monitoring_grafana → Grafana
+#   monitoring_db      → PostgreSQL (backend cho Grafana)
+#   monitoring_loki    → Loki log cluster
+#   monitoring_gitea   → Gitea + Ansible Runner
+#   monitoring_thanos_receive → Thanos Receive (ghi vào S3)
+#   monitoring_thanos_query   → Thanos Query (đọc từ S3)
+#
+# Thêm node mới:
+#   1. Thêm host vào monitoring_all với ansible_host
+#   2. Thêm hostname vào các group phù hợp bên dưới
+#   3. Tạo file inventory/host_vars/<hostname>.yml nếu có config riêng
+# =============================================================================
+
+all:
+  children:
+
+    # --------------------------------------------------------------------------
+    # monitoring_all — Nguồn duy nhất khai báo host + IP
+    # Tất cả group khác chỉ tham chiếu hostname, KHÔNG khai báo lại ansible_host
+    # --------------------------------------------------------------------------
+    monitoring_all:
+      hosts:
+        obs01:
+          ansible_host: 10.171.131.31
+          # keepalived: priority=110 (MASTER) — tự tính bởi keepalived template
+        obs02:
+          ansible_host: 10.171.131.32
+          # keepalived: priority=100 (BACKUP) — tự tính bởi keepalived template
+        obs03:
+          ansible_host: 10.171.131.33
+          # keepalived: priority=90  (BACKUP) — tự tính bởi keepalived template
+
+    # --------------------------------------------------------------------------
+    # Load Balancer — HAProxy + Keepalived (VIP failover)
+    # --------------------------------------------------------------------------
+    monitoring_lb:
+      hosts:
+        obs01:
+        obs02:
+        obs03:
+
+    # --------------------------------------------------------------------------
+    # VictoriaMetrics Storage — vmstorage (lưu trữ time-series)
+    # --------------------------------------------------------------------------
+    monitoring_storage:
+      hosts:
+        obs01:
+        obs02:
+        obs03:
+
+    # --------------------------------------------------------------------------
+    # VictoriaMetrics Insert — vminsert (nhận metrics từ vmagent)
+    # Dùng để generate vmagent_remote_write_urls động
+    # --------------------------------------------------------------------------
+    monitoring_insert:
+      hosts:
+        obs01:
+        obs02:
+        obs03:
+
+    # --------------------------------------------------------------------------
+    # VictoriaMetrics Query — vmselect (query từ Grafana)
+    # --------------------------------------------------------------------------
+    monitoring_query:
+      hosts:
+        obs01:
+        obs02:
+        obs03:
+
+    # --------------------------------------------------------------------------
+    # vmagent — Scrape metrics từ exporters, ghi vào vminsert
+    # --------------------------------------------------------------------------
+    monitoring_vmagent:
+      hosts:
+        obs01:
+        obs02:
+        obs03:
+
+    # --------------------------------------------------------------------------
+    # Alertmanager — HA cluster, gossip protocol
+    # --------------------------------------------------------------------------
+    monitoring_alertmanager:
+      hosts:
+        obs01:
+        obs02:
+
+    # --------------------------------------------------------------------------
+    # Grafana — Visualization
+    # --------------------------------------------------------------------------
+    monitoring_grafana:
+      hosts:
+        obs01:
+        obs02:
+        obs03:
+
+    # --------------------------------------------------------------------------
+    # PostgreSQL — Backend database cho Grafana
+    # --------------------------------------------------------------------------
+    monitoring_db:
+      hosts:
+        obs01:
+        obs02:
+        obs03:
+
+    # --------------------------------------------------------------------------
+    # Loki — Log aggregation cluster (replication_factor: 2)
+    # --------------------------------------------------------------------------
+    monitoring_loki:
+      hosts:
+        obs01:
+        obs03:
+
+    # --------------------------------------------------------------------------
+    # Gitea + Ansible Runner — GitOps workflow
+    # --------------------------------------------------------------------------
+    monitoring_gitea:
+      hosts:
+        obs01:
+
+    # --------------------------------------------------------------------------
+    # Thanos — Long-term storage trên S3 (chỉ active khi s3_enabled: true)
+    # --------------------------------------------------------------------------
+    monitoring_thanos_receive:
+      hosts:
+        obs01:
+        obs02:
+        obs03:
+
+    monitoring_thanos_query:
+      hosts:
+        obs01:

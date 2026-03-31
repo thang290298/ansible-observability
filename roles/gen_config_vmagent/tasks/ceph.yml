@@ -1,0 +1,32 @@
+---
+# roles/gen_config_vmagent/tasks/ceph.yml
+# =============================================================================
+# Gen scrape_ceph_<site>.yml cho từng group trong ceph_groups
+# =============================================================================
+
+- name: "[gen_config/ceph] Gen scrape config cho từng ceph group"
+  vars:
+    _first_host: "{{ groups[target_group][0] }}"
+    _site: "{{ hostvars[_first_host].meta.site | default(hostvars[_first_host].site | default(target_group)) }}"
+    _output_file: "{{ gen_config_output_dir }}/scrape_ceph_{{ _site }}.yml"
+  ansible.builtin.template:
+    src: scrape_ceph.yml.j2
+    dest: "{{ _output_file }}"
+    owner: "{{ gen_config_file_owner }}"
+    group: "{{ gen_config_file_group }}"
+    mode: "{{ gen_config_file_mode }}"
+    backup: true
+  loop: "{{ ceph_groups }}"
+  loop_control:
+    loop_var: target_group
+    label: "{{ target_group }} → scrape_ceph_{{ hostvars[groups[target_group][0]].meta.site | default(target_group) }}.yml"
+  when:
+    - groups[target_group] is defined
+    - groups[target_group] | length > 0
+  register: ceph_config_result
+  tags: [gen_config, ceph]
+
+- name: "[gen_config/ceph] ✅ Ceph scrape configs generated"
+  ansible.builtin.debug:
+    msg: "Generated {{ ceph_config_result.results | selectattr('changed') | list | length }} / {{ ceph_groups | length }} ceph scrape files"
+  tags: [gen_config, ceph]

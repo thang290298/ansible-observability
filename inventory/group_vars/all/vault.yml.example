@@ -1,0 +1,61 @@
+---
+# inventory/group_vars/all/vault.yml.example
+# =============================================================================
+# HƯỚNG DẪN:
+#   1. Copy file này thành vault.yml rồi điền giá trị thực:
+#        cp inventory/group_vars/all/vault.yml.example inventory/group_vars/all/vault.yml
+#
+#   2. Chỉnh sửa vault.yml với passwords thực tế của bạn
+#
+#   3. Tạo file .vault_pass chứa vault password (KHÔNG commit file này):
+#        echo "your-vault-password" > .vault_pass
+#        chmod 600 .vault_pass
+#
+#   4. Encrypt vault.yml:
+#        ansible-vault encrypt inventory/group_vars/all/vault.yml
+#
+#   5. Để edit sau khi đã encrypt:
+#        ansible-vault edit inventory/group_vars/all/vault.yml
+# =============================================================================
+
+# SSH password để connect đến servers (hoặc dùng SSH key thay thế)
+vault_ssh_password: ""
+
+# Keepalived VRRP authentication
+vault_vrrp_auth_pass: ""
+
+# HAProxy stats page
+vault_haproxy_stats_password: ""
+
+# Telegram alerting
+vault_telegram_bot_token: ""
+vault_telegram_chat_id: ""
+vault_telegram_critical_chat_id: ""
+
+# Grafana
+vault_grafana_admin_password: ""
+vault_grafana_db_password: ""
+
+# PostgreSQL
+vault_postgres_password: ""
+
+# MinIO (S3-compatible backend cho Loki)
+vault_minio_root_user: "minioadmin"
+vault_minio_root_password: ""
+
+# Loki
+vault_loki_password: ""
+
+# Gitea + Ansible Runner
+vault_gitea_admin_password: ""
+vault_gitea_db_password: ""
+vault_gitea_secret_key: ""
+vault_ansible_webhook_secret: ""
+
+# S3 SmartCloud (external backup + long-term storage)
+vault_s3_endpoint: "https://s3hn.smartcloud.vn"
+vault_s3_access_key: ""
+vault_s3_secret_key: ""
+vault_s3_bucket_metrics: "metrics"
+vault_s3_bucket_logs: "logs"
+vault_s3_bucket_thanos: "thanos"

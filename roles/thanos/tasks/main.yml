@@ -1,0 +1,38 @@
+---
+# roles/thanos/tasks/main.yml
+
+- name: "[thanos] Skip khi s3_enabled=false"
+  ansible.builtin.debug:
+    msg: "⏭️ Thanos skipped — s3_enabled=false"
+  when: not (s3_enabled | default(false))
+
+- name: "[thanos] Tạo thư mục data"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ monitoring_base_dir }}/thanos-receive"
+    - "{{ monitoring_base_dir }}/thanos-store"
+    - "{{ monitoring_base_dir }}/thanos-query"
+    - "{{ thanos_receive_data_path }}"
+    - "{{ thanos_store_data_path }}"
+  when: s3_enabled | default(false)
+
+- name: "[thanos] Deploy thanos-receive"
+  ansible.builtin.include_tasks: receive.yml
+  when:
+    - s3_enabled | default(false)
+    - inventory_hostname in groups['monitoring_thanos_receive']
+
+- name: "[thanos] Deploy thanos-store"
+  ansible.builtin.include_tasks: store.yml
+  when:
+    - s3_enabled | default(false)
+    - inventory_hostname in groups['monitoring_thanos_query']
+
+- name: "[thanos] Deploy thanos-query"
+  ansible.builtin.include_tasks: query.yml
+  when:
+    - s3_enabled | default(false)
+    - inventory_hostname in groups['monitoring_thanos_query']

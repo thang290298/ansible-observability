@@ -1,0 +1,7 @@
+---
+# inventory/host_vars/compute01-ntl4.yml
+meta:
+  host: compute01-ntl4
+  ip: 10.165.50.21
+  site: ntl4
+  role: compute

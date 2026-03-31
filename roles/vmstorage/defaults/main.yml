@@ -1,4 +1,11 @@
-﻿---
+---
 # roles/vmstorage/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+vmstorage_port: 8482
+vmstorage_vminsert_port: 8400
+vmstorage_vmselect_port: 8401
+vm_storage_data_path: "/data/vmstorage"
+vm_retention_period: "12"
+vmstorage_mem_limit: "4g"
+vmstorage_cpu_limit: "2.0"

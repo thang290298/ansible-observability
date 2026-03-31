@@ -1,0 +1,16 @@
+---
+# inventory/group_vars/site_dbp4.yml
+# =============================================================================
+# Site-specific variables cho DBP4 (Di An Business Park 4)
+# Dùng bởi: gen_config_vmagent role
+# Pattern: site: dbp4 → scrape files được đặt tên scrape_*_dbp4.yml
+# =============================================================================
+
+site: dbp4
+
+# Exporter ports — thường giống nhau giữa sites, nhưng có thể override
+node_exporter_port: 9100
+ceph_exporter_port: 9283       # ceph-exporter (native)
+ceph_telegraf_port: 9128       # telegraf ceph plugin (legacy)
+openstack_exporter_port: 9180  # openstack-exporter
+libvirt_exporter_port: 9177    # libvirt/telegraf

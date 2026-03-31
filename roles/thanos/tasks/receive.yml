@@ -1,0 +1,41 @@
+---
+# roles/thanos/tasks/receive.yml
+
+- name: "[thanos-receive] Generate hashrings.json"
+  ansible.builtin.copy:
+    content: |
+      [
+        {
+          "endpoints": [
+      {% for host in groups['monitoring_thanos_receive'] %}
+            "{{ hostvars[host]['ansible_host'] }}:{{ thanos_receive_grpc_port }}"{% if not loop.last %},{% endif %}
+
+      {% endfor %}
+          ]
+        }
+      ]
+    dest: "{{ monitoring_base_dir }}/thanos-receive/hashrings.json"
+    mode: "0644"
+
+- name: "[thanos-receive] Deploy objstore config"
+  ansible.builtin.template:
+    src: objstore.yml.j2
+    dest: "{{ monitoring_base_dir }}/thanos-receive/objstore.yml"
+    mode: "0644"
+
+- name: "[thanos-receive] Deploy docker-compose"
+  ansible.builtin.template:
+    src: receive-docker-compose.yml.j2
+    dest: "{{ monitoring_base_dir }}/thanos-receive/docker-compose.yml"
+    mode: "0644"
+
+- name: "[thanos-receive] Start"
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/thanos-receive"
+    state: present
+    pull: missing
+  register: receive_result
+
+- name: "[thanos-receive] ✅ OK"
+  ansible.builtin.debug:
+    msg: "thanos-receive running on {{ ansible_host }}:{{ thanos_receive_http_port }}"

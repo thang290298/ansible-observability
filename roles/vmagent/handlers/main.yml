@@ -1,6 +1,6 @@
 ---
 - name: Reload vmagent
-  uri:
+  ansible.builtin.uri:
     url: "http://localhost:{{ vmagent_port }}/-/reload"
     method: GET
     status_code: 200

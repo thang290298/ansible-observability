@@ -1,0 +1,9 @@
+---
+# inventory/host_vars/compute01-dbp4.yml
+# Pattern: meta.ip + meta.host + meta.site + meta.role
+# Mỗi host có file riêng → không bao giờ nhầm IP giữa các site
+meta:
+  host: compute01-dbp4
+  ip: 10.167.50.21
+  site: dbp4
+  role: compute

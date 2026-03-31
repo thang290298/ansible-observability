@@ -2,14 +2,14 @@
 # roles/common/tasks/main.yml
 
 - name: "[common] Cập nhật package cache"
-  apt:
+  ansible.builtin.apt:
     update_cache: true
     cache_valid_time: 3600
   when: ansible_os_family == "Debian"
   tags: [common, packages]
 
 - name: "[common] Cài các package cần thiết"
-  package:
+  ansible.builtin.package:
     name:
       - curl
       - wget
@@ -25,27 +25,27 @@
   tags: [common, packages]
 
 - name: "[common] Cấu hình NTP"
-  template:
+  ansible.builtin.template:
     src: chrony.conf.j2
     dest: /etc/chrony.conf
   notify: Restart chrony
   tags: [common, ntp]
 
 - name: "[common] Enable và start chronyd"
-  service:
+  ansible.builtin.service:
     name: chronyd
     state: started
     enabled: true
   tags: [common, ntp]
 
 - name: "[common] Cấu hình timezone"
-  timezone:
+  community.general.timezone:
     name: Asia/Ho_Chi_Minh
   tags: [common, timezone]
 
 # [FIX H5] firewalld chỉ chạy trên RedHat/CentOS — Ubuntu dùng ufw
 - name: "[common] Cấu hình firewalld (RedHat/CentOS only)"
-  firewalld:
+  ansible.posix.firewalld:
     port: "{{ item }}/tcp"
     permanent: true
     state: enabled
@@ -75,14 +75,14 @@
 
 # [FIX H5] UFW rules cho Ubuntu/Debian
 - name: "[common] Cài ufw (Debian/Ubuntu)"
-  apt:
+  ansible.builtin.apt:
     name: ufw
     state: present
   when: ansible_os_family == "Debian"
   tags: [common, firewall]
 
 - name: "[common] Cấu hình ufw — cho phép monitoring ports (Debian/Ubuntu)"
-  ufw:
+  community.general.ufw:
     rule: allow
     port: "{{ item }}"
     proto: tcp
@@ -110,7 +110,7 @@
   tags: [common, firewall]
 
 - name: "[common] Enable ufw"
-  ufw:
+  community.general.ufw:
     state: enabled
     policy: deny
     direction: incoming
@@ -119,7 +119,7 @@
   tags: [common, firewall]
 
 - name: "[common] Tạo thư mục cấu trúc monitoring"
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: '0755'
@@ -136,3 +136,15 @@
     - "/backup/monitoring"
   become: true
   tags: [common, directories]
+
+- name: "[common] Allow traffic giữa các cluster nodes (iptables direct — cho Ubuntu không dùng ufw)"
+  ansible.builtin.iptables:
+    chain: INPUT
+    source: "{{ item }}"
+    jump: ACCEPT
+    state: present
+  loop: "{{ groups['all'] | map('extract', hostvars, 'ansible_host') | list }}"
+  become: true
+  when: ansible_os_family == "RedHat"
+  notify: Save iptables rules
+  tags: [common, firewall]

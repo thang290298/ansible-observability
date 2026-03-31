@@ -1,12 +1,12 @@
 ---
 - name: Restart keepalived
-  systemd:
+  ansible.builtin.systemd:
     name: keepalived
     state: restarted
   become: true
 
 - name: Reload keepalived
-  systemd:
+  ansible.builtin.systemd:
     name: keepalived
     state: reloaded
   become: true

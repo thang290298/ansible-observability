@@ -4,7 +4,7 @@
 # Chạy trên: monitoring_db group
 
 - name: "[postgresql] Hiển thị cấu hình"
-  debug:
+  ansible.builtin.debug:
     msg: |
       ══════════════════════════════════════════
       Deploying PostgreSQL {{ postgres_version }}
@@ -16,7 +16,7 @@
 # ── INSTALL ─────────────────────────────────────────────────────────────────
 
 - name: "[postgresql] Tạo thư mục config"
-  file:
+  ansible.builtin.file:
     path: "{{ monitoring_base_dir }}/postgresql"
     state: directory
     mode: '0755'
@@ -24,7 +24,7 @@
   tags: [postgresql]
 
 - name: "[postgresql] Tạo thư mục data (owner postgres UID 999)"
-  file:
+  ansible.builtin.file:
     path: "{{ postgres_data_path }}"
     state: directory
     mode: '0700'
@@ -42,7 +42,7 @@
 # ── CONFIGURE ────────────────────────────────────────────────────────────────
 
 - name: "[postgresql] Generate docker-compose"
-  template:
+  ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ monitoring_base_dir }}/postgresql/docker-compose.yml"
     mode: '0644'
@@ -51,7 +51,7 @@
   tags: [postgresql]
 
 - name: "[postgresql] Generate init SQL script"
-  template:
+  ansible.builtin.template:
     src: init.sql.j2
     dest: "{{ monitoring_base_dir }}/postgresql/init.sql"
     mode: '0644'
@@ -68,7 +68,7 @@
 # ── VERIFY ────────────────────────────────────────────────────────────────────
 
 - name: "[postgresql] Chờ PostgreSQL sẵn sàng"
-  command: >
+  ansible.builtin.command: >
     docker exec postgresql pg_isready -U postgres
   register: pg_ready
   retries: 15
@@ -78,7 +78,7 @@
   tags: [postgresql, verify]
 
 - name: "[postgresql] Tạo database và user cho Grafana"
-  command: >
+  ansible.builtin.command: >
     docker exec postgresql psql -U postgres -c
     "SELECT 1 FROM pg_database WHERE datname='{{ grafana_db_name }}'"
   register: grafana_db_check
@@ -87,13 +87,13 @@
   tags: [postgresql]
 
 - name: "[postgresql] Init Grafana database nếu chưa tồn tại"
-  command: >
+  ansible.builtin.command: >
     docker exec postgresql psql -U postgres -f /docker-entrypoint-initdb.d/init.sql
   # [FIX M4] Dùng regex match thay vì string 'in' để tránh false negative
   when: grafana_db_check.stdout_lines | select('match', '.*1 row.*') | list | length == 0
   tags: [postgresql]
 
 - name: "[postgresql] ✅ PostgreSQL OK trên {{ inventory_hostname }}"
-  debug:
+  ansible.builtin.debug:
     msg: "PostgreSQL running at {{ ansible_host }}:{{ postgres_port }}"
   tags: [postgresql, verify]

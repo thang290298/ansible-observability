@@ -1,0 +1,19 @@
+---
+# playbooks/stacks/logging.yml
+# Deploy Logging stack: loki → promtail
+# MinIO không dùng — Loki dùng S3 external (s3_enabled=true) hoặc filesystem
+
+- name: "[logging/01] Loki — monitoring_loki"
+  hosts: monitoring_loki
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [loki, logs]
+  roles: [loki]
+
+- name: "[logging/02] Promtail — tất cả servers"
+  hosts: promtail_nodes
+  become: true
+  gather_facts: false
+  tags: [promtail, logs]
+  roles: [promtail]

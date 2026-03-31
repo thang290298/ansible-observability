@@ -1,0 +1,13 @@
+---
+# inventory/group_vars/site_ntl4.yml
+# =============================================================================
+# Site-specific variables cho NTL4 (Nam Thang Long 4)
+# =============================================================================
+
+site: ntl4
+
+node_exporter_port: 9100
+ceph_exporter_port: 9283
+ceph_telegraf_port: 9128
+openstack_exporter_port: 9180
+libvirt_exporter_port: 9177

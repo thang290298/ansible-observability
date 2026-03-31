@@ -1,4 +1,3 @@
-version: "3.8"
 # vmselect — xử lý query, đọc từ vmstorage cluster
 # Group: monitoring_query ({{ groups['monitoring_query'] | length }} nodes)
 # storageNode: {{ vmstorage_select_nodes | join(', ') }}
@@ -10,7 +9,7 @@ services:
     restart: unless-stopped
     command:
       - "--storageNode={{ vmstorage_select_nodes | join(',') }}"
-      - "--deduplicateMinScrapeInterval={{ vmagent_scrape_interval }}"
+      - "--dedup.minScrapeInterval={{ vmagent_scrape_interval }}"
       - "--httpListenAddr=:{{ vmselect_port }}"
       - "--loggerLevel=INFO"
       - "--search.maxConcurrentRequests=16"
@@ -19,7 +18,7 @@ services:
     volumes:
       - vmselect_cache:/vmselect-cache
     ports:
-      - "{{ vmselect_port }}:{{ vmselect_port }}"
+      - "{{ vmselect_internal_port | default(vmselect_port) }}:{{ vmselect_port }}"
     mem_limit: "{{ vmselect_mem_limit | default('2g') }}"
     cpus: "{{ vmselect_cpu_limit | default('1.5') }}"
     labels:
@@ -30,11 +29,6 @@ services:
       options:
         max-size: "50m"
         max-file: "3"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:{{ vmselect_port }}/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
 volumes:
   vmselect_cache:

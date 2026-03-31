@@ -1,0 +1,28 @@
+---
+# roles/thanos/tasks/query.yml
+
+- name: "[thanos-query] Deploy docker-compose"
+  ansible.builtin.template:
+    src: query-docker-compose.yml.j2
+    dest: "{{ monitoring_base_dir }}/thanos-query/docker-compose.yml"
+    mode: "0644"
+
+- name: "[thanos-query] Start"
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/thanos-query"
+    state: present
+    pull: missing
+
+- name: "[thanos-query] Wait ready"
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ thanos_query_http_port_internal | default(10912) }}/-/ready"
+    status_code: 200
+  register: query_health
+  until: query_health.status == 200
+  retries: 15
+  delay: 5
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: "[thanos-query] ✅ OK"
+  ansible.builtin.debug:
+    msg: "thanos-query ready — internal: {{ ansible_host }}:{{ thanos_query_http_port_internal | default(10912) }} | HAProxy: {{ thanos_query_http_port }}"

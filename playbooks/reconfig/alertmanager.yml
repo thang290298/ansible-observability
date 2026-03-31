@@ -1,0 +1,38 @@
+---
+# playbooks/reconfig/alertmanager.yml
+# Reload Alertmanager config (no downtime)
+# v6.0 — Stack reconfig
+
+- name: "🚨 [reconfig/alertmanager] Reload Alertmanager config"
+  hosts: "{{ target_nodes | default(groups['monitoring_alertmanager']) }}"
+  become: true
+  gather_facts: false
+  tags: [reconfig, alertmanager]
+
+  tasks:
+    - name: "[reconfig/alertmanager] Regenerate Alertmanager config"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../roles/alertmanager/templates/config.yml.j2"
+        dest: "{{ monitoring_base_dir }}/alertmanager/alertmanager.yml"
+        backup: true
+      register: am_config_updated
+
+    - name: "[reconfig/alertmanager] Reload Alertmanager (POST /-/reload)"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ alertmanager_port }}/-/reload"
+        method: POST
+        status_code: [200, 204]
+      when: am_config_updated.changed
+      register: am_reload
+      ignore_errors: true
+
+    - name: "[reconfig/alertmanager] Fallback — restart nếu reload thất bại"
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_base_dir }}/alertmanager"
+        state: present
+        restarted: true
+      when: am_config_updated.changed and (am_reload is failed or am_reload.status not in [200, 204])
+
+    - name: "[reconfig/alertmanager] ✅ Alertmanager status"
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: Alertmanager {{ 'reloaded' if am_config_updated.changed else 'unchanged' }}"

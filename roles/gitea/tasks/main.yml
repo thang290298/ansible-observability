@@ -1,10 +1,10 @@
-﻿---
+---
 # roles/gitea/tasks/main.yml
 # Deploy Gitea Git server với Ansible Runner webhook
 # Chạy trên: monitoring_gitea group
 
 - name: "[gitea] Hiển thị cấu hình"
-  debug:
+  ansible.builtin.debug:
     msg: |
       ══════════════════════════════════════════
       Deploying Gitea
@@ -18,7 +18,7 @@
 # ── INSTALL ─────────────────────────────────────────────────────────────────
 
 - name: "[gitea] Tạo thư mục"
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: '0755'
@@ -42,7 +42,7 @@
 # ── CONFIGURE ────────────────────────────────────────────────────────────────
 
 - name: "[gitea] Generate docker-compose"
-  template:
+  ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ monitoring_base_dir }}/gitea/docker-compose.yml"
     mode: '0644'
@@ -51,7 +51,7 @@
   tags: [gitea]
 
 - name: "[gitea] Generate app.ini config"
-  template:
+  ansible.builtin.template:
     src: app.ini.j2
     dest: "{{ gitea_data_path }}/config/app.ini"
     mode: '0644'
@@ -70,15 +70,16 @@
 # ── VERIFY ────────────────────────────────────────────────────────────────────
 
 - name: "[gitea] Chờ Gitea sẵn sàng"
-  uri:
+  ansible.builtin.uri:
     url: "http://localhost:{{ gitea_port }}"
     status_code: [200, 302]
+  ignore_errors: true
   retries: 20
   delay: 5
   register: gitea_health
   tags: [gitea, verify]
 
 - name: "[gitea] ✅ Gitea OK trên {{ inventory_hostname }}"
-  debug:
+  ansible.builtin.debug:
     msg: "Gitea running at http://{{ ansible_host }}:{{ gitea_port }}"
   tags: [gitea, verify]

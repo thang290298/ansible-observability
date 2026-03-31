@@ -2,7 +2,7 @@
 # roles/common/tasks/main.yml (bổ sung log rotation cho Promtail positions)
 
 - name: "[common] Cấu hình logrotate cho Promtail positions"
-  copy:
+  ansible.builtin.copy:
     dest: /etc/logrotate.d/promtail
     content: |
       /var/lib/promtail/positions.yaml {
@@ -15,8 +15,23 @@
       }
     mode: '0644'
 
-- name: "[common] Cấu hình Docker log rotation mặc định"
-  copy:
+# FIX H5: Thay vì ghi đè toàn bộ /etc/docker/daemon.json (sẽ xóa config hiện có),
+# dùng /etc/docker/daemon.d/ drop-in directory (Docker >= 25.0) hoặc tách thành
+# file config riêng cho log rotation.
+#
+# Approach: Ghi log config vào /etc/docker/daemon.json CHỈ KHI file chưa tồn tại
+# (lần đầu deploy). Nếu đã có daemon.json, chỉ thêm log settings vào bằng jq merge.
+# Điều này tránh overwrite các settings khác như "insecure-registries", "storage-driver", etc.
+#
+# Nếu bạn dùng Docker >= 25.0, dùng drop-in dir /etc/docker/daemon.d/*.json thay thế.
+
+- name: "[common] Kiểm tra /etc/docker/daemon.json đã tồn tại chưa"
+  ansible.builtin.stat:
+    path: /etc/docker/daemon.json
+  register: docker_daemon_json
+
+- name: "[common] Cấu hình Docker log rotation (lần đầu — file chưa tồn tại)"
+  ansible.builtin.copy:
     dest: /etc/docker/daemon.json
     content: |
       {
@@ -30,4 +45,32 @@
         "experimental": true
       }
     mode: '0644'
+  when: not docker_daemon_json.stat.exists
+  notify: Restart docker
+
+- name: "[common] Merge log rotation vào daemon.json hiện có (nếu đã tồn tại)"
+  ansible.builtin.shell: |
+    python3 -c "
+    import json, sys
+    with open('/etc/docker/daemon.json', 'r') as f:
+      cfg = json.load(f)
+    log_settings = {
+      'log-driver': 'json-file',
+      'log-opts': {'max-size': '100m', 'max-file': '3'}
+    }
+    changed = False
+    for k, v in log_settings.items():
+      if cfg.get(k) != v:
+        cfg[k] = v
+        changed = True
+    if changed:
+      with open('/etc/docker/daemon.json', 'w') as f:
+        json.dump(cfg, f, indent=2)
+      print('changed')
+    else:
+      print('ok')
+    "
+  register: merge_result
+  changed_when: merge_result.stdout == 'changed'
+  when: docker_daemon_json.stat.exists
   notify: Restart docker

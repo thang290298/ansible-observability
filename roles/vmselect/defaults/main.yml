@@ -1,4 +1,7 @@
-﻿---
+---
 # roles/vmselect/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+vmselect_port: 8481
+vmselect_mem_limit: "2g"
+vmselect_cpu_limit: "1.5"

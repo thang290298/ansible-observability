@@ -1,8 +1,19 @@
-inventory/group_vars/vault.yml
+# Ansible Vault & secrets
+inventory/group_vars/all/vault.yml
+inventory/group_vars/all/vault.yml.REAL_BACKUP
 .vault_pass
+*.vault_pass
+
+# Ansible
 *.retry
 logs/
 *.log
+
+# Python
 __pycache__/
 *.pyc
 .env
+
+# OS
+.DS_Store
+Thumbs.db

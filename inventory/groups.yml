@@ -1,0 +1,66 @@
+---
+# =============================================================================
+# inventory/groups.yml
+# Nhóm tổng hợp — kết nối monitoring cluster với tất cả sites
+#
+# File này KHÔNG chứa hosts, chỉ định nghĩa quan hệ cha-con giữa các group.
+# Hosts thực tế nằm trong monitoring.yml và site-*.yml
+#
+# Khi thêm site mới (vd: site-ntl3.yml):
+#   1. Tạo inventory/site-ntl3.yml
+#   2. Tạo inventory/group_vars/site_ntl3.yml
+#   3. Thêm site_ntl3 vào exporters + promtail_nodes bên dưới
+# =============================================================================
+
+all:
+  children:
+
+    # --------------------------------------------------------------------------
+    # monitoring — Toàn bộ cụm hạ tầng giám sát
+    # Dùng để: deploy site.yml, upgrade, backup, verify
+    # --------------------------------------------------------------------------
+    monitoring:
+      children:
+        monitoring_all:
+        monitoring_lb:
+        monitoring_storage:
+        monitoring_insert:
+        monitoring_query:
+        monitoring_grafana:
+        monitoring_vmagent:
+        monitoring_alertmanager:
+        monitoring_db:
+        monitoring_loki:
+        monitoring_gitea:
+        monitoring_thanos_receive:
+        monitoring_thanos_query:
+
+    # --------------------------------------------------------------------------
+    # exporters — Tất cả servers cần cài node_exporter + exporter riêng
+    # Dùng để: ./run.sh node-exporter, ./run.sh ceph-exporter, v.v.
+    # --------------------------------------------------------------------------
+    exporters:
+      children:
+        # Monitoring nodes cũng cần node_exporter
+        monitoring_lb:
+
+        # Servers tại các sites
+        site_dbp3:
+        site_dbp4:
+        site_ntl4:
+        # site_ntl3:   ← uncomment khi thêm site NTL3
+
+    # --------------------------------------------------------------------------
+    # promtail_nodes — Tất cả servers cần cài Promtail (log collector)
+    # Dùng để: ./run.sh logging (phần promtail)
+    # --------------------------------------------------------------------------
+    promtail_nodes:
+      children:
+        # Monitoring nodes tự monitor logs của chính mình
+        monitoring:
+
+        # Tất cả site servers
+        site_dbp3:
+        site_dbp4:
+        site_ntl4:
+        # site_ntl3:   ← uncomment khi thêm site NTL3

@@ -1,0 +1,13 @@
+---
+# inventory/group_vars/site_dbp3.yml
+# =============================================================================
+# Site-specific variables cho DBP3 (Di An Business Park 3)
+# =============================================================================
+
+site: dbp3
+
+node_exporter_port: 9100
+ceph_exporter_port: 9283
+ceph_telegraf_port: 9128
+openstack_exporter_port: 9180
+libvirt_exporter_port: 9177

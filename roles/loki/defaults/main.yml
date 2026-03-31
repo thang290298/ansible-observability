@@ -1,4 +1,15 @@
-﻿---
+---
 # roles/loki/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+loki_version: "3.3.2"
+loki_port: 3100
+loki_grpc_port: 9096
+loki_memberlist_port: 7946
+loki_data_path: "/data/loki"
+loki_retention_period: "30d"
+loki_replication_factor: 2
+loki_mem_limit: "2g"
+loki_cpu_limit: "1.5"
+loki_chunk_cache_mb: 512
+loki_minio_bucket: "loki"

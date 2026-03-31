@@ -1,0 +1,184 @@
+---
+# playbooks/verify.yml
+# Health check toàn diện hệ thống
+
+- name: "🔍 [VERIFY] Kiểm tra sức khỏe hệ thống"
+  hosts: monitoring
+  become: false
+  gather_facts: false
+  tags: [verify, health]
+
+  tasks:
+    - name: "[verify] Kiểm tra Keepalived (VIP)"
+      ansible.builtin.shell: ip addr show | grep -c "{{ vip_address }}" || echo "0"
+      register: vip_check
+      changed_when: false
+
+    - name: "[verify] VIP status"
+      ansible.builtin.debug:
+        msg: "{{ 'VIP ACTIVE on ' + inventory_hostname if vip_check.stdout | int > 0 else 'VIP not here' }}"
+
+    - name: "[verify] Kiểm tra HAProxy"
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ haproxy_stats_port }}/stats"
+        method: GET
+        status_code: 200
+        url_username: "{{ haproxy_stats_user }}"
+        url_password: "{{ haproxy_stats_password }}"
+      register: haproxy_check
+      ignore_errors: true
+
+    - name: "[verify] HAProxy status"
+      ansible.builtin.debug:
+        msg: "HAProxy: {{ '✅ OK' if haproxy_check.status == 200 else '❌ FAILED' }}"
+
+    - name: "[verify] Kiểm tra vmstorage"
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ vmstorage_port }}/metrics"
+        status_code: 200
+      register: vmstorage_check
+      ignore_errors: true
+
+    - name: "[verify] Kiểm tra vminsert"
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ vminsert_port }}/metrics"
+        status_code: 200
+      register: vminsert_check
+      ignore_errors: true
+
+    - name: "[verify] Kiểm tra vmselect"
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ vmselect_port }}/metrics"
+        status_code: 200
+      register: vmselect_check
+      ignore_errors: true
+
+    - name: "[verify] Kiểm tra Grafana"
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ grafana_port }}/api/health"
+        status_code: 200
+      register: grafana_check
+      ignore_errors: true
+
+    - name: "[verify] Kiểm tra Alertmanager"
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ alertmanager_port }}/-/healthy"
+        status_code: 200
+      register: am_check
+      ignore_errors: true
+
+    - name: "[verify] Kiểm tra vmagent"
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ vmagent_port }}/metrics"
+        status_code: 200
+      register: vmagent_check
+      ignore_errors: true
+
+    - name: "[verify] 📋 HEALTH SUMMARY — {{ inventory_hostname }}"
+      ansible.builtin.debug:
+        msg: |
+          ╔══════════════════════════════════════════════════════╗
+          ║  HEALTH CHECK: {{ inventory_hostname }} ({{ ansible_host }})
+          ╠══════════════════════════════════════════════════════╣
+          ║  HAProxy       : {{ '✅ OK' if haproxy_check.status | default(0) == 200 else '❌ FAILED' }}
+          ║  vmstorage     : {{ '✅ OK' if vmstorage_check.status | default(0) == 200 else '❌ FAILED' }}
+          ║  vminsert      : {{ '✅ OK' if vminsert_check.status | default(0) == 200 else '❌ FAILED' }}
+          ║  vmselect      : {{ '✅ OK' if vmselect_check.status | default(0) == 200 else '❌ FAILED' }}
+          ║  Grafana       : {{ '✅ OK' if grafana_check.status | default(0) == 200 else '❌ FAILED' }}
+          ║  Alertmanager  : {{ '✅ OK' if am_check.status | default(0) == 200 else '❌ FAILED' }}
+          ║  vmagent       : {{ '✅ OK' if vmagent_check.status | default(0) == 200 else '❌ FAILED' }}
+          ╚══════════════════════════════════════════════════════╝
+
+# Kiểm tra Loki
+- name: "📋 [VERIFY] Kiểm tra Loki"
+  hosts: monitoring_loki
+  become: false
+  gather_facts: false
+
+  tasks:
+    - name: "[verify] Loki /ready"
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ loki_port }}/ready"
+        status_code: 200
+      register: loki_check
+      ignore_errors: true
+
+    - name: "[verify] Loki metrics"
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ loki_port }}/metrics"
+        status_code: 200
+      register: loki_metrics
+      ignore_errors: true
+
+    - name: "[verify] Loki status"
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: Loki {{ '✅ OK' if loki_check.status | default(0) == 200 else '❌ FAILED' }}"
+
+# Kiểm tra Promtail
+- name: "🪵 [VERIFY] Kiểm tra Promtail"
+  hosts: promtail_nodes
+  become: false
+  gather_facts: false
+
+  tasks:
+    - name: "[verify] Promtail /ready"
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ promtail_port }}/ready"
+        status_code: 200
+      register: promtail_check
+      ignore_errors: true
+
+    - name: "[verify] Promtail status"
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: Promtail {{ '✅ OK' if promtail_check.status | default(0) == 200 else '❌ FAILED' }}"
+
+# Kiểm tra node_exporter trên tất cả servers
+- name: "📊 [VERIFY] Kiểm tra node_exporter"
+  hosts: exporters
+  become: false
+  gather_facts: false
+
+  tasks:
+    - name: "[verify] node_exporter health"
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ node_exporter_port }}/metrics"
+        status_code: 200
+      register: ne_check
+      ignore_errors: true
+
+    - name: "[verify] node_exporter status"
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: {{ '✅ OK' if ne_check.status | default(0) == 200 else '❌ FAILED' }}"
+
+# Kiểm tra VIP và query metrics cuối cùng
+- name: "🌐 [VERIFY] Kiểm tra VIP và end-to-end"
+  hosts: monitoring[0]
+  become: false
+  gather_facts: false
+
+  tasks:
+    - name: "[verify] Query metrics qua VIP"
+      ansible.builtin.uri:
+        url: "http://{{ vip_address }}:{{ vmselect_port }}/select/0/prometheus/api/v1/query?query=up"
+        method: GET
+        status_code: 200
+      register: query_check
+      ignore_errors: true
+
+    - name: "[verify] Đếm targets đang UP"
+      ansible.builtin.set_fact:
+        targets_up: "{{ (query_check.json.data.result | default([]) | selectattr('value.1', 'equalto', '1') | list | length) }}"
+      when: query_check.status | default(0) == 200
+
+    - name: "[verify] 🎯 END-TO-END SUMMARY"
+      ansible.builtin.debug:
+        msg: |
+          ╔══════════════════════════════════════════════════════╗
+          ║  END-TO-END HEALTH CHECK                            ║
+          ╠══════════════════════════════════════════════════════╣
+          ║  VIP ({{ vip_address }})                            ║
+          ║  VictoriaMetrics query : {{ '✅ OK' if query_check.status | default(0) == 200 else '❌ FAILED' }}
+          ║  Targets UP            : {{ targets_up | default('N/A') }}
+          ║  Grafana URL           : http://{{ vip_address }}:80
+          ║  HAProxy Stats         : http://{{ vip_address }}:{{ haproxy_stats_port }}/stats
+          ╚══════════════════════════════════════════════════════╝

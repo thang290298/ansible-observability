@@ -1,0 +1,37 @@
+---
+# =============================================================================
+# inventory/site-dbp3.yml
+# Site DBP3 — Di An Business Park 3
+#
+# Cấu trúc group trong site:
+#   site_dbp3              Parent group toàn bộ site
+#   ├── ceph_dbp3          Ceph storage cluster
+#   └── (thêm role mới vào đây khi cần)
+#
+# Thêm server mới:
+#   1. Thêm host vào group phù hợp bên dưới
+#   2. Tạo file inventory/host_vars/<hostname>.yml (nếu có meta info)
+#   3. Chạy: ./run.sh node-exporter --limit <hostname>
+# =============================================================================
+
+site_dbp3:
+  vars:
+    site: dbp3
+    # Group vars chung cho toàn site — override tại group_vars/site_dbp3.yml
+
+  children:
+
+    # --------------------------------------------------------------------------
+    # Ceph Storage Cluster — DBP3
+    # Exporters: ceph-exporter (port 9283)
+    # --------------------------------------------------------------------------
+    ceph_dbp3:
+      vars:
+        role: ceph
+        cluster: ceph-dbp3
+        ceph_exporter_port: 9283
+      hosts:
+        ceph01-dbp3: { ansible_host: 10.x.x.10 }
+        ceph02-dbp3: { ansible_host: 10.x.x.11 }
+        ceph03-dbp3: { ansible_host: 10.x.x.12 }
+        # ceph04-dbp3: { ansible_host: 10.x.x.13 }

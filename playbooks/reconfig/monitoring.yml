@@ -1,0 +1,70 @@
+---
+# playbooks/reconfig/monitoring.yml
+# Reload vmagent config + alert rules (no downtime)
+# v6.0 — Stack reconfig
+
+- name: "🔄 [reconfig/monitoring] Reload vmagent scrape config"
+  hosts: "{{ target_nodes | default(groups['monitoring_vmagent']) }}"
+  become: true
+  gather_facts: false
+  tags: [reconfig, vmagent, targets]
+
+  tasks:
+    - name: "[reconfig] Tạo thư mục vmagent"
+      ansible.builtin.file:
+        path: "{{ monitoring_base_dir }}/vmagent"
+        state: directory
+        mode: '0755'
+
+    - name: "[reconfig] Generate scrape.yml từ targets/*.yml"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../roles/vmagent/templates/vmagent-scrape.yml.j2"
+        dest: /etc/vmagent/scrape.yml
+        backup: true
+        mode: '0644'
+      register: scrape_updated
+
+    - name: "[reconfig] Reload vmagent (SIGHUP — không restart)"
+      ansible.builtin.shell: |
+        docker kill --signal=SIGHUP vmagent 2>/dev/null && echo "SIGHUP sent" \
+        || docker restart vmagent && echo "restarted"
+      register: reload_result
+      when: scrape_updated.changed
+
+    - name: "[reconfig] Chờ vmagent load config mới"
+      ansible.builtin.pause:
+        seconds: 5
+      when: scrape_updated.changed
+
+    - name: "[reconfig] ✅ vmagent reload status"
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: {{ reload_result.stdout | default('no change') }}"
+
+- name: "🚨 [reconfig/monitoring] Reload alert rules"
+  hosts: "{{ target_nodes | default(groups['monitoring_vmagent']) }}"
+  become: true
+  gather_facts: false
+  tags: [reconfig, alerts]
+
+  tasks:
+    - name: "[reconfig] Tạo thư mục vmalert rules"
+      ansible.builtin.file:
+        path: "{{ monitoring_base_dir }}/vmalert/rules"
+        state: directory
+        mode: '0755'
+
+    - name: "[reconfig] Copy alert rules"
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../alert-rules/"
+        dest: "{{ monitoring_base_dir }}/vmalert/rules/"
+        mode: '0644'
+      register: rules_updated
+
+    - name: "[reconfig] Reload vmagent/vmalert (SIGHUP)"
+      ansible.builtin.shell: |
+        docker kill --signal=SIGHUP vmagent 2>/dev/null || true
+      when: rules_updated.changed
+
+    - name: "[reconfig] ✅ Alert rules reload status"
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: alert rules {{ 'updated' if rules_updated.changed else 'unchanged' }}"

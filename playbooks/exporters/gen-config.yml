@@ -1,0 +1,58 @@
+---
+# playbooks/exporters/gen-config.yml
+# =============================================================================
+# Generate vmagent scrape configs từ inventory (host_vars meta pattern)
+# v6.0 — gen_config_vmagent role
+#
+# Cách dùng:
+#   ./run.sh gen-config
+#   ./run.sh gen-config -e "node_groups=['compute_hn4','compute_dbp4']"
+#   ./run.sh gen-config -e "ceph_groups=['ceph_dbp3']" --tags gen_config,ceph
+#
+# Pattern:
+#   inventory/host_vars/hostname.yml   → meta.ip, meta.host, meta.site, meta.role
+#   inventory/group_vars/site_*.yml    → site: dbp4, node_exporter_port: 9100
+#   Output: /opt/monitoring/vmagent/scrape_configs/scrape_<type>_<site>.yml
+#
+# Ví dụ đầy đủ:
+#   ./run.sh gen-config \
+#     -e "node_groups=['compute_hn4','compute_dbp4','ceph_dbp3']" \
+#     -e "ceph_groups=['ceph_dbp3','ceph_dbp4']" \
+#     -e "openstack_groups=['controller_hn4']" \
+#     -e "libvirt_groups=['compute_hn4']"
+# =============================================================================
+
+- name: "🔧 [gen-config] Generate vmagent scrape configs from inventory"
+  hosts: "{{ vmagent_host | default(groups['monitoring_vmagent'][0]) }}"
+  become: true
+  gather_facts: false
+  tags: [gen_config, exporters]
+
+  pre_tasks:
+    - name: "[gen-config] Validate: node_groups phải có host_vars với meta.ip"
+      ansible.builtin.assert:
+        that:
+          - hostvars[item].meta is defined
+          - hostvars[item].meta.ip is defined
+          - hostvars[item].meta.host is defined
+          - hostvars[item].meta.site is defined
+        fail_msg: |
+          Host '{{ item }}' thiếu meta vars!
+          Cần thêm vào inventory/host_vars/{{ item }}.yml:
+            meta:
+              host: {{ item }}
+              ip: <IP_ADDRESS>
+              site: <SITE_NAME>
+              role: <ROLE>
+      loop: "{{ (node_groups + ceph_groups + openstack_groups + libvirt_groups + blackbox_groups) | map('extract', groups) | flatten | unique }}"
+      when: >
+        node_groups | length > 0 or
+        ceph_groups | length > 0 or
+        openstack_groups | length > 0 or
+        libvirt_groups | length > 0 or
+        blackbox_groups | length > 0
+      ignore_errors: true
+      run_once: true
+
+  roles:
+    - role: gen_config_vmagent

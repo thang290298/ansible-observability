@@ -1,5 +1,0 @@
----
-# playbooks/reconfig.yml
-# Entry point cho reconfig — delegates to specific playbooks
-# Sử dụng qua: ./run.sh reconfig hoặc make reconfig
-- import_playbook: reconfig-all.yml

@@ -48,8 +48,7 @@ backend grafana_back
     option httpchk GET /api/health
     http-check expect status 200
 {% for host in groups['monitoring_grafana'] %}
-    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ grafana_port }} \
-        check inter 2s fall 3 rise 2 cookie s{{ loop.index }}
+    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ grafana_port }} check inter 2s fall 3 rise 2 cookie s{{ loop.index }}
 {% endfor %}
 
 # =============================================================================
@@ -65,8 +64,7 @@ backend vminsert_back
     option httpchk GET /health
     http-check expect status 200
 {% for host in groups['monitoring_query'] %}
-    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ vminsert_port }} \
-        check inter 2s fall 3 rise 2
+    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ vminsert_internal_port | default(vminsert_port) }} check inter 2s fall 3 rise 2
 {% endfor %}
 
 # =============================================================================
@@ -82,8 +80,7 @@ backend vmselect_back
     option httpchk GET /health
     http-check expect status 200
 {% for host in groups['monitoring_query'] %}
-    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ vmselect_port }} \
-        check inter 2s fall 3 rise 2
+    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ vmselect_internal_port | default(vmselect_port) }} check inter 2s fall 3 rise 2
 {% endfor %}
 
 # =============================================================================
@@ -99,8 +96,7 @@ backend alertmanager_back
     option httpchk GET /-/healthy
     http-check expect status 200
 {% for host in groups['monitoring_alertmanager'] %}
-    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ alertmanager_port }} \
-        check inter 2s fall 3 rise 2
+    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ alertmanager_internal_port | default(alertmanager_port) }} check inter 2s fall 3 rise 2
 {% endfor %}
 
 # =============================================================================
@@ -116,8 +112,7 @@ backend loki_back
     option httpchk GET /ready
     http-check expect string ready
 {% for host in groups['monitoring_loki'] %}
-    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ loki_port }} \
-        check inter 5s fall 3 rise 2
+    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ loki_internal_port | default(loki_port) }} check inter 5s fall 3 rise 2
 {% endfor %}
 
 # =============================================================================
@@ -130,8 +125,42 @@ frontend vmagent_front
 
 backend vmagent_back
     balance roundrobin
-    option httpchk GET /metrics
+    option httpchk GET /-/healthy
+    http-check expect status 200
 {% for host in groups['monitoring_vmagent'] %}
-    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ vmagent_port }} \
-        check inter 5s fall 3 rise 2
+    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ vmagent_internal_port | default(vmagent_port) }} check inter 5s fall 3 rise 2
 {% endfor %}
+
+# =============================================================================
+# BLACKBOX EXPORTER — ICMP probe endpoint
+# Group: monitoring_lb ({{ groups['monitoring_lb'] | length }} nodes)
+# =============================================================================
+frontend blackbox_front
+    bind *:{{ blackbox_exporter_port }}
+    default_backend blackbox_back
+
+backend blackbox_back
+    balance roundrobin
+    option httpchk GET /health
+    http-check expect status 200
+{% for host in groups['monitoring_lb'] %}
+    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ blackbox_exporter_port }} check inter 5s fall 3 rise 2
+{% endfor %}
+
+# =============================================================================
+# THANOS QUERY — PromQL federation (chỉ khi s3_enabled=true)
+# Group: monitoring_thanos_query
+# =============================================================================
+{% if s3_enabled | default(false) %}
+frontend thanos_query_front
+    bind *:{{ thanos_query_http_port }}
+    default_backend thanos_query_back
+
+backend thanos_query_back
+    balance roundrobin
+    option httpchk GET /-/ready
+    http-check expect status 200
+{% for host in groups['monitoring_thanos_query'] %}
+    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ thanos_query_http_port_internal | default(10912) }} check inter 5s fall 3 rise 2
+{% endfor %}
+{% endif %}

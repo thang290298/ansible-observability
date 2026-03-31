@@ -1,4 +1,7 @@
-﻿---
+---
 # roles/vmagent/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+vmagent_port: 8429
+vmagent_scrape_interval: "15s"
+vmagent_data_path: "/data/vmagent"

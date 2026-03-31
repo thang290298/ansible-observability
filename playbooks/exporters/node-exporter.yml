@@ -1,0 +1,11 @@
+---
+# playbooks/exporters/node-exporter.yml
+# Deploy node_exporter only
+# v6.0 — Exporter-based deployment
+
+- name: "📊 [exporters] node_exporter — exporters group"
+  hosts: exporters
+  become: true
+  gather_facts: false
+  tags: [node_exporter, exporters]
+  roles: [node_exporter]

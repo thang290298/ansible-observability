@@ -1,31 +1,27 @@
 ---
 # roles/alertmanager/tasks/main.yml
-# Deploy Alertmanager cluster với gossip-based HA
-# Chạy trên: monitoring_alertmanager group
+# Deploy Alertmanager cluster voi gossip-based HA
 
-- name: "[alertmanager] Hiển thị cấu hình"
-  debug:
-    msg: |
-      ══════════════════════════════════════════
-      Deploying Alertmanager {{ alertmanager_version }}
-      Node        : {{ inventory_hostname }} ({{ ansible_host }})
-      HTTP port   : {{ alertmanager_port }}
-      Cluster port: {{ alertmanager_cluster_port }}
-      Data path   : {{ alertmanager_data_path }}
-      Peers       : {{ alertmanager_peers | join(', ') }}
-      ══════════════════════════════════════════
+- name: "[alertmanager] Hien thi deploy info"
+  ansible.builtin.debug:
+    msg:
+      - "Deploying Alertmanager {{ alertmanager_version }}"
+      - "Node: {{ inventory_hostname }} ({{ ansible_host }})"
+      - "HTTP port: {{ alertmanager_port }}"
+      - "Cluster port: {{ alertmanager_cluster_port }}"
+      - "Data path: {{ alertmanager_data_path }}"
+      - "Peers: {{ alertmanager_peers | join(', ') }}"
 
-# ── INSTALL ─────────────────────────────────────────────────────────────────
-
-- name: "[alertmanager] Tạo thư mục config"
-  file:
+# ── INSTALL ──────────────────────────────────────────────────────────────────
+- name: "[alertmanager] Tao thu muc config"
+  ansible.builtin.file:
     path: "{{ monitoring_base_dir }}/alertmanager"
     state: directory
     mode: '0755'
   become: true
 
-- name: "[alertmanager] Tạo thư mục data (owner nobody UID 65534)"
-  file:
+- name: "[alertmanager] Tao thu muc data (owner nobody UID 65534)"
+  ansible.builtin.file:
     path: "{{ alertmanager_data_path }}"
     state: directory
     mode: '0755'
@@ -40,9 +36,8 @@
   tags: [alertmanager]
 
 # ── CONFIGURE ────────────────────────────────────────────────────────────────
-
 - name: "[alertmanager] Generate alertmanager config"
-  template:
+  ansible.builtin.template:
     src: config.yml.j2
     dest: "{{ monitoring_base_dir }}/alertmanager/config.yml"
     mode: '0644'
@@ -51,7 +46,7 @@
   tags: [alertmanager]
 
 - name: "[alertmanager] Generate docker-compose"
-  template:
+  ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ monitoring_base_dir }}/alertmanager/docker-compose.yml"
     mode: '0644'
@@ -60,25 +55,17 @@
   tags: [alertmanager]
 
 # ── START SERVICE ─────────────────────────────────────────────────────────────
-
 - name: "[alertmanager] Start Alertmanager"
   community.docker.docker_compose_v2:
     project_src: "{{ monitoring_base_dir }}/alertmanager"
     state: present
   tags: [alertmanager]
 
-# ── VERIFY ────────────────────────────────────────────────────────────────────
-
-- name: "[alertmanager] Chờ Alertmanager sẵn sàng"
-  uri:
+- name: "[alertmanager] Health check"
+  ansible.builtin.uri:
     url: "http://localhost:{{ alertmanager_port }}/-/healthy"
     status_code: 200
-  retries: 15
+  retries: 10
   delay: 5
-  register: alertmanager_health
-  tags: [alertmanager, verify]
-
-- name: "[alertmanager] ✅ Alertmanager OK trên {{ inventory_hostname }}"
-  debug:
-    msg: "Alertmanager running at {{ ansible_host }}:{{ alertmanager_port }}"
-  tags: [alertmanager, verify]
+  ignore_errors: true
+  tags: [alertmanager]

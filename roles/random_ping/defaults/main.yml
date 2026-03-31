@@ -1,4 +1,8 @@
-﻿---
+---
 # roles/random_ping/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+random_ping_pairs_per_round: 10
+random_ping_rotate_interval: 120
+blackbox_exporter_port: 9115
+blackbox_exporter_version: "v0.25.0"

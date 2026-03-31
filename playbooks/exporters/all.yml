@@ -1,0 +1,9 @@
+---
+# playbooks/exporters/all.yml
+# Deploy tất cả exporters
+# v6.0 — Exporter-based deployment
+
+- import_playbook: node-exporter.yml
+- import_playbook: blackbox.yml
+- import_playbook: ceph-exporter.yml
+- import_playbook: openstack-exporter.yml

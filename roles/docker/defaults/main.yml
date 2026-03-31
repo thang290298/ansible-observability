@@ -1,4 +1,7 @@
-﻿---
+---
 # roles/docker/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+# docker_version can be set to pin a specific version e.g. "5:24.0.7-1~ubuntu.22.04~jammy"
+# Leave unset (or use '*') for latest available
+docker_version: "*"

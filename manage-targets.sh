@@ -27,7 +27,7 @@ case "$ACTION" in
     apply)
         echo "🔄 Applying targets → reload vmagent..."
         ansible monitoring_vmagent \
-            -i "$SCRIPT_DIR/inventory/hosts.yml" \
+            -i "$SCRIPT_DIR/inventory/" \
             -m uri \
             -a "url=http://localhost:8429/-/reload method=GET"
         echo "✅ vmagent reloaded"

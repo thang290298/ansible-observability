@@ -1,28 +1,40 @@
-version: "3.8"
 # vmagent — scrape agent, active-active
 # Instance: {{ inventory_hostname }} ({{ ansible_host }})
-# Remote write: {{ vmagent_remote_write_url }}
+# Remote write: {{ vmagent_remote_write_urls | join(', ') }}
+# Active-active: mỗi vmagent scrape toàn bộ targets
+# vmselect dedup với --deduplicateMinScrapeInterval={{ vmagent_scrape_interval }}
 
 services:
   vmagent:
-    image: victoriametrics/vmagent:{{ victoriametrics_version }}
+    image: victoriametrics/vmagent:{{ vmagent_version }}
     container_name: vmagent
     restart: unless-stopped
     command:
       - "--promscrape.config=/etc/vmagent/scrape.yml"
       - "--promscrape.configCheckInterval=60s"
-      - "--remoteWrite.url={{ vmagent_remote_write_url }}"
+      # [FIX] Ghi trực tiếp vào từng vminsert node thay vì qua VIP
+      # → nếu VIP failover, vmagent vẫn tiếp tục ghi vào node còn sống
+{% for url in vmagent_remote_write_urls %}
+      - "--remoteWrite.url={{ url }}"
+{% endfor %}
+{% if s3_enabled | default(false) %}
+      # Ghi đến tất cả Thanos Receive nodes (HA) — không dùng [0] để tránh SPOF
+{% for host in groups['monitoring_thanos_receive'] %}
+      - "--remoteWrite.url=http://{{ hostvars[host]['ansible_host'] }}:{{ thanos_receive_http_port | default(19291) }}/api/v1/receive"
+{% endfor %}
+{% endif %}
       - "--remoteWrite.tmpDataPath={{ vmagent_data_path }}"
       - "--remoteWrite.maxDiskUsagePerURL=1073741824"
       - "--httpListenAddr=:{{ vmagent_port }}"
       - "--loggerLevel=INFO"
+      - "--promscrape.config.strictParse=false"
     volumes:
       - /etc/vmagent:/etc/vmagent:ro
       - {{ vmagent_data_path }}:{{ vmagent_data_path }}
     ports:
-      - "{{ vmagent_port }}:{{ vmagent_port }}"
-    mem_limit: "1g"
-    cpus: "1.0"
+      - "{{ vmagent_internal_port | default(vmagent_port) }}:{{ vmagent_port }}"
+    mem_limit: "{{ vmagent_mem_limit | default('1g') }}"
+    cpus: "{{ vmagent_cpu_limit | default('1.0') }}"
     labels:
       monitoring: "true"
       component: "vmagent"
@@ -31,8 +43,3 @@ services:
       options:
         max-size: "50m"
         max-file: "3"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:{{ vmagent_port }}/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5

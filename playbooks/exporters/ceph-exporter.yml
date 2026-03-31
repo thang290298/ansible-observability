@@ -1,0 +1,26 @@
+---
+# playbooks/exporters/ceph-exporter.yml
+# Deploy Ceph exporter
+# v6.0 — Exporter-based deployment
+#
+# PLACEHOLDER: Role 'ceph_exporter' chưa được implement
+# TODO: Tạo role roles/ceph_exporter/ với:
+#   - Download ceph_exporter binary
+#   - Cấu hình ceph credentials
+#   - Systemd service chạy user riêng
+#   - Port: {{ ceph_exporter_port }} (default: 9283)
+
+- name: "🦑 [exporters] Ceph Exporter — ceph_dbp3 group"
+  hosts: ceph_dbp3
+  become: true
+  gather_facts: false
+  tags: [ceph_exporter, exporters]
+
+  tasks:
+    - name: "[ceph-exporter] PLACEHOLDER — role chưa implement"
+      ansible.builtin.debug:
+        msg: |
+          ⚠️  Ceph exporter role chưa được implement.
+          TODO: Tạo roles/ceph_exporter/ role.
+          Ceph group: {{ inventory_hostname }} ({{ ansible_host }})
+          Exporter port: {{ ceph_exporter_port | default(9283) }}

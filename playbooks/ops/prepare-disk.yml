@@ -1,0 +1,186 @@
+---
+# =============================================================================
+# playbooks/ops/prepare-disk.yml
+# Chuẩn bị disk vdb — format ext4, mount vào /data
+# Chạy TRƯỚC khi deploy bất kỳ stack nào
+#
+# Usage:
+#   ./run.sh prepare-disk
+#   ansible-playbook -i inventory/monitoring.yml playbooks/ops/prepare-disk.yml
+# =============================================================================
+
+- name: Prepare vdb disk for data storage
+  hosts: monitoring_lb  # chạy trên tất cả monitoring nodes (lb = full set)
+  become: true
+  gather_facts: true
+
+  tasks:
+
+    - name: "Show disk layout trước khi chuẩn bị"
+      ansible.builtin.command: lsblk
+      register: lsblk_before
+      changed_when: false
+
+    - name: "Print lsblk output"
+      ansible.builtin.debug:
+        msg: "{{ lsblk_before.stdout_lines }}"
+
+    # -------------------------------------------------------------------------
+    # Kiểm tra /data đã mount chưa
+    # -------------------------------------------------------------------------
+    - name: "Kiểm tra /data đã được mount chưa"
+      ansible.builtin.command: mountpoint -q /data
+      register: data_mounted
+      failed_when: false
+      changed_when: false
+
+    - name: "Bỏ qua nếu /data đã mount"
+      ansible.builtin.debug:
+        msg: "/data đã được mount sẵn — bỏ qua format/mount steps"
+      when: data_mounted.rc == 0
+
+    # -------------------------------------------------------------------------
+    # Kiểm tra disk vdb tồn tại
+    # -------------------------------------------------------------------------
+    - name: "Kiểm tra /dev/vdb tồn tại"
+      ansible.builtin.stat:
+        path: /dev/vdb
+      register: vdb_stat
+      when: data_mounted.rc != 0
+
+    - name: "Fail nếu /dev/vdb không tồn tại"
+      ansible.builtin.fail:
+        msg: |
+          KHÔNG TÌM THẤY /dev/vdb trên {{ inventory_hostname }}!
+          Kiểm tra lại disk có được attach chưa: lsblk
+      when:
+        - data_mounted.rc != 0
+        - not vdb_stat.stat.exists
+
+    # -------------------------------------------------------------------------
+    # Tạo partition table + partition
+    # -------------------------------------------------------------------------
+    - name: "Kiểm tra /dev/vdb1 đã tồn tại chưa"
+      ansible.builtin.stat:
+        path: /dev/vdb1
+      register: vdb1_stat
+      when: data_mounted.rc != 0
+
+    - name: "Tạo GPT partition table trên /dev/vdb"
+      ansible.builtin.command: parted /dev/vdb --script mklabel gpt
+      when:
+        - data_mounted.rc != 0
+        - not vdb1_stat.stat.exists
+      register: parted_label
+
+    - name: "Tạo primary partition chiếm toàn bộ /dev/vdb"
+      ansible.builtin.command: parted /dev/vdb --script mkpart primary ext4 0% 100%
+      when:
+        - data_mounted.rc != 0
+        - not vdb1_stat.stat.exists
+      register: parted_part
+
+    - name: "Chờ kernel nhận diện partition mới"
+      ansible.builtin.command: partprobe /dev/vdb
+      when:
+        - data_mounted.rc != 0
+        - not vdb1_stat.stat.exists
+
+    - name: "Chờ /dev/vdb1 xuất hiện"
+      ansible.builtin.wait_for:
+        path: /dev/vdb1
+        timeout: 30
+      when: data_mounted.rc != 0
+
+    # -------------------------------------------------------------------------
+    # Format ext4
+    # -------------------------------------------------------------------------
+    - name: "Kiểm tra filesystem trên /dev/vdb1"
+      ansible.builtin.command: blkid /dev/vdb1
+      register: blkid_result
+      failed_when: false
+      changed_when: false
+      when: data_mounted.rc != 0
+
+    - name: "Format /dev/vdb1 với ext4"
+      ansible.builtin.filesystem:
+        fstype: ext4
+        dev: /dev/vdb1
+        opts: "-L data"
+      when:
+        - data_mounted.rc != 0
+        - "'ext4' not in (blkid_result.stdout | default(''))"
+
+    # -------------------------------------------------------------------------
+    # Mount /data
+    # -------------------------------------------------------------------------
+    - name: "Tạo thư mục /data"
+      ansible.builtin.file:
+        path: /data
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: "Lấy UUID của /dev/vdb1"
+      ansible.builtin.command: blkid -s UUID -o value /dev/vdb1
+      register: vdb1_uuid
+      changed_when: false
+      when: data_mounted.rc != 0
+
+    - name: "Mount /dev/vdb1 vào /data với fstab (persistent)"
+      ansible.builtin.mount:
+        path: /data
+        src: "UUID={{ vdb1_uuid.stdout | trim }}"
+        fstype: ext4
+        opts: defaults,nofail
+        state: mounted
+      when: data_mounted.rc != 0
+
+    # -------------------------------------------------------------------------
+    # Tạo cấu trúc thư mục con trong /data
+    # -------------------------------------------------------------------------
+    - name: "Tạo thư mục con trong /data"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      loop:
+        - /data/vmstorage
+        - /data/alertmanager
+        - /data/grafana
+        - /data/postgres
+        - /data/vmagent
+        - /data/loki
+        - /data/minio
+        - /data/gitea
+        - /data/promtail
+
+    # -------------------------------------------------------------------------
+    # Verify
+    # -------------------------------------------------------------------------
+    - name: "Kiểm tra disk sau khi mount"
+      ansible.builtin.command: df -h /data
+      register: df_output
+      changed_when: false
+
+    - name: "Kết quả disk /data"
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: {{ df_output.stdout_lines }}"
+
+    - name: "Kiểm tra fstab entry"
+      ansible.builtin.command: grep '/data' /etc/fstab
+      register: fstab_check
+      changed_when: false
+
+    - name: "fstab entry"
+      ansible.builtin.debug:
+        msg: "fstab: {{ fstab_check.stdout }}"
+
+    - name: "Tổng kết disk preparation"
+      ansible.builtin.debug:
+        msg: |
+          ✅ {{ inventory_hostname }} — disk /data sẵn sàng
+          Dung lượng: {{ df_output.stdout_lines | last }}

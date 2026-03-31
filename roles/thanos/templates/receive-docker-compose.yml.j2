@@ -1,0 +1,37 @@
+# thanos-receive — Write path từ vmagent → S3 Thanos format
+# Node: {{ inventory_hostname }} ({{ ansible_host }})
+
+services:
+  thanos-receive:
+    image: quay.io/thanos/thanos:{{ thanos_version }}
+    container_name: thanos-receive
+    restart: unless-stopped
+    command:
+      - receive
+      - --grpc-address=0.0.0.0:{{ thanos_receive_grpc_port }}
+      - --http-address=0.0.0.0:{{ thanos_receive_http_port | default(19290) }}
+      - --remote-write.address=0.0.0.0:{{ thanos_receive_remote_write_port | default(19291) }}
+      - --tsdb.path=/thanos-data
+      - --tsdb.retention=2h
+      - --label=receive_replica="{{ inventory_hostname }}"
+      - --label=cluster="monitoring"
+      - --receive.replication-factor={{ thanos_receive_replication_factor }}
+      - --receive.hashrings-file=/etc/thanos/hashrings.json
+      - --objstore.config-file=/etc/thanos/objstore.yml
+    volumes:
+      - {{ thanos_receive_data_path }}:/thanos-data
+      - ./hashrings.json:/etc/thanos/hashrings.json:ro
+      - ./objstore.yml:/etc/thanos/objstore.yml:ro
+    ports:
+      - "{{ thanos_receive_http_port | default(19290) }}:{{ thanos_receive_http_port | default(19290) }}"
+      - "{{ thanos_receive_remote_write_port | default(19291) }}:{{ thanos_receive_remote_write_port | default(19291) }}"
+      - "{{ thanos_receive_grpc_port }}:{{ thanos_receive_grpc_port }}"
+    mem_limit: "1g"
+    labels:
+      monitoring: "true"
+      component: "thanos-receive"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

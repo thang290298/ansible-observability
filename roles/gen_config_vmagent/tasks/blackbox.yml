@@ -1,0 +1,33 @@
+---
+# roles/gen_config_vmagent/tasks/blackbox.yml
+# =============================================================================
+# Gen scrape_blackbox_<site>.yml cho từng group trong blackbox_groups
+# Dùng blackbox exporter để probe HTTP/ICMP endpoints
+# =============================================================================
+
+- name: "[gen_config/blackbox] Gen scrape config cho từng blackbox group"
+  vars:
+    _first_host: "{{ groups[target_group][0] }}"
+    _site: "{{ hostvars[_first_host].meta.site | default(hostvars[_first_host].site | default(target_group)) }}"
+    _output_file: "{{ gen_config_output_dir }}/scrape_blackbox_{{ _site }}.yml"
+  ansible.builtin.template:
+    src: scrape_blackbox.yml.j2
+    dest: "{{ _output_file }}"
+    owner: "{{ gen_config_file_owner }}"
+    group: "{{ gen_config_file_group }}"
+    mode: "{{ gen_config_file_mode }}"
+    backup: true
+  loop: "{{ blackbox_groups }}"
+  loop_control:
+    loop_var: target_group
+    label: "{{ target_group }} → scrape_blackbox_{{ hostvars[groups[target_group][0]].meta.site | default(target_group) }}.yml"
+  when:
+    - groups[target_group] is defined
+    - groups[target_group] | length > 0
+  register: blackbox_config_result
+  tags: [gen_config, blackbox]
+
+- name: "[gen_config/blackbox] ✅ Blackbox scrape configs generated"
+  ansible.builtin.debug:
+    msg: "Generated {{ blackbox_config_result.results | selectattr('changed') | list | length }} / {{ blackbox_groups | length }} blackbox scrape files"
+  tags: [gen_config, blackbox]

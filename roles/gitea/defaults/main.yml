@@ -1,4 +1,9 @@
-﻿---
+---
 # roles/gitea/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+gitea_version: "1.22.3"
+gitea_port: 3001
+gitea_ssh_port: 2222
+gitea_data_path: "/data/gitea"
+ansible_runner_port: 9000

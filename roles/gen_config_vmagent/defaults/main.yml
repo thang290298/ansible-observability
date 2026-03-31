@@ -1,0 +1,35 @@
+---
+# roles/gen_config_vmagent/defaults/main.yml
+# =============================================================================
+# gen_config_vmagent — Generate vmagent scrape configs from inventory
+# Pattern: host_vars/hostname.yml → meta.ip, meta.host, meta.site, meta.role
+#          group_vars/site_*.yml  → site: dbp4, node_exporter_port: 9100...
+# Output:  /opt/monitoring/vmagent/scrape_configs/scrape_<type>_<site>.yml
+# =============================================================================
+
+# Output directory cho scrape configs (mounted vào vmagent container)
+gen_config_output_dir: "{{ monitoring_base_dir }}/vmagent/scrape_configs"
+
+# Owner của scrape config files
+gen_config_file_owner: root
+gen_config_file_group: root
+gen_config_file_mode: "0644"
+
+# Reload vmagent sau khi gen xong (SIGHUP — không restart)
+gen_config_reload_vmagent: true
+
+# Port defaults (override trong group_vars/site_*.yml theo từng site)
+node_exporter_port: 9100
+ceph_exporter_port: 9283       # ceph-exporter (native)
+ceph_telegraf_port: 9128       # telegraf ceph plugin (legacy)
+openstack_exporter_port: 9180  # openstack-exporter
+libvirt_exporter_port: 9177    # libvirt-exporter (telegraf)
+blackbox_exporter_port: 9115   # blackbox exporter
+
+# Groups mặc định — override qua extra_vars khi chạy
+# Ví dụ: ansible-playbook gen-config.yml -e "node_groups=['compute_hn4','compute_dbp4']"
+node_groups: []       # groups có node_exporter
+ceph_groups: []       # groups có ceph hosts
+openstack_groups: []  # groups có openstack controllers
+libvirt_groups: []    # groups có libvirt/compute hosts
+blackbox_groups: []   # groups cần blackbox probing

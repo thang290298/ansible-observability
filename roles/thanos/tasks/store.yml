@@ -1,0 +1,24 @@
+---
+# roles/thanos/tasks/store.yml
+
+- name: "[thanos-store] Deploy objstore config"
+  ansible.builtin.template:
+    src: objstore.yml.j2
+    dest: "{{ monitoring_base_dir }}/thanos-store/objstore.yml"
+    mode: "0644"
+
+- name: "[thanos-store] Deploy docker-compose"
+  ansible.builtin.template:
+    src: store-docker-compose.yml.j2
+    dest: "{{ monitoring_base_dir }}/thanos-store/docker-compose.yml"
+    mode: "0644"
+
+- name: "[thanos-store] Start"
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/thanos-store"
+    state: present
+    pull: missing
+
+- name: "[thanos-store] ✅ OK"
+  ansible.builtin.debug:
+    msg: "thanos-store running on {{ ansible_host }}:{{ thanos_store_http_port }}"

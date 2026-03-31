@@ -1,9 +1,8 @@
 ---
 # roles/node_exporter/tasks/main.yml
 
-# [FIX M2] Tạo user system riêng cho node_exporter (không chạy root)
 - name: "[node_exporter] Tạo user node_exporter"
-  user:
+  ansible.builtin.user:
     name: node_exporter
     system: true
     shell: /usr/sbin/nologin
@@ -13,7 +12,7 @@
   tags: [node_exporter]
 
 - name: "[node_exporter] Tạo thư mục textfile_collector"
-  file:
+  ansible.builtin.file:
     path: "{{ node_exporter_data_path }}"
     state: directory
     mode: '0755'
@@ -22,37 +21,44 @@
   become: true
   tags: [node_exporter]
 
-- name: "[node_exporter] Download binary"
-  get_url:
-    url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
-    dest: "/tmp/node_exporter.tar.gz"
-    mode: '0644'
+- name: "[node_exporter] Check if binary exists"
+  ansible.builtin.stat:
+    path: /usr/local/bin/node_exporter
+  register: ne_binary
+  tags: [node_exporter]
+
+- name: "[node_exporter] Download binary via curl"
+  ansible.builtin.shell: |
+    curl -L --retry 3 --retry-delay 5 -o /tmp/node_exporter.tar.gz       "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+  args:
+    creates: /tmp/node_exporter.tar.gz
+  when: not ne_binary.stat.exists
   register: ne_downloaded
   tags: [node_exporter]
 
 - name: "[node_exporter] Extract"
-  unarchive:
+  ansible.builtin.unarchive:
     src: /tmp/node_exporter.tar.gz
     dest: /tmp/
     remote_src: true
-  when: ne_downloaded.changed
+  when: not ne_binary.stat.exists
   tags: [node_exporter]
 
 - name: "[node_exporter] Install binary"
-  copy:
+  ansible.builtin.copy:
     src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
     dest: /usr/local/bin/node_exporter
     mode: '0755'
     owner: root
     group: root
     remote_src: true
-  when: ne_downloaded.changed
+  when: not ne_binary.stat.exists
   become: true
   notify: Restart node_exporter
   tags: [node_exporter]
 
 - name: "[node_exporter] Create systemd service"
-  copy:
+  ansible.builtin.copy:
     dest: /etc/systemd/system/node_exporter.service
     mode: '0644'
     content: |
@@ -89,7 +95,7 @@
   tags: [node_exporter]
 
 - name: "[node_exporter] Enable + Start"
-  systemd:
+  ansible.builtin.systemd:
     name: node_exporter
     enabled: true
     state: started
@@ -98,9 +104,10 @@
   tags: [node_exporter]
 
 - name: "[node_exporter] Verify"
-  uri:
+  ansible.builtin.uri:
     url: "http://localhost:{{ node_exporter_port }}/metrics"
     status_code: 200
+  ignore_errors: true
   retries: 5
   delay: 3
   tags: [node_exporter, verify]

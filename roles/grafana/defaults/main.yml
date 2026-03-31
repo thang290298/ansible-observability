@@ -1,4 +1,11 @@
-﻿---
+---
 # roles/grafana/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+grafana_version: "11.4.0"
+grafana_port: 3000
+grafana_admin_user: "admin"
+grafana_db_port: 5432
+grafana_db_name: "grafana"
+grafana_db_user: "grafana"
+grafana_data_path: "/data/grafana"

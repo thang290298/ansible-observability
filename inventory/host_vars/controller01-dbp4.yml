@@ -1,0 +1,7 @@
+---
+# inventory/host_vars/controller01-dbp4.yml
+meta:
+  host: controller01-dbp4
+  ip: 10.167.50.10
+  site: dbp4
+  role: controller

@@ -1,0 +1,11 @@
+---
+# requirements.yml — Ansible Galaxy dependencies
+# Cài đặt: ansible-galaxy collection install -r requirements.yml
+# Hoặc:    make deps
+
+collections:
+  - name: community.docker
+    version: ">=3.0.0"
+
+  - name: community.general
+    version: ">=7.0.0"

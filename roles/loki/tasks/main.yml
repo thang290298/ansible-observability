@@ -4,7 +4,7 @@
 # Chạy trên: monitoring_loki group (mặc định node01 + node02)
 
 - name: "[loki] Hiển thị cấu hình"
-  debug:
+  ansible.builtin.debug:
     msg: |
       ══════════════════════════════════════════
       Deploying Loki {{ loki_version }}
@@ -16,29 +16,31 @@
       ══════════════════════════════════════════
 
 - name: "[loki] Tạo thư mục"
-  file:
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    mode: '0755'
+    mode: '0777'
   loop:
     - "{{ monitoring_base_dir }}/loki"
     - "{{ loki_data_path }}"
     - "{{ loki_data_path }}/wal"            # WAL buffer (local, fast)
     - "{{ loki_data_path }}/index"          # TSDB index cache (local)
     - "{{ loki_data_path }}/index/cache"
+    - "{{ loki_data_path }}/chunks"          # Filesystem fallback chunks
     - "{{ loki_data_path }}/chunks-cache"   # Chunk cache (local)
     - "{{ loki_data_path }}/compactor"      # Compactor temp (local)
     - "{{ loki_data_path }}/ruler"          # Ruler temp (local)
+    - "{{ loki_data_path }}/rules"          # Rules directory
 
 - name: "[loki] Generate loki config"
-  template:
+  ansible.builtin.template:
     src: loki-config.yml.j2
     dest: "{{ monitoring_base_dir }}/loki/config.yml"
     backup: true
   notify: Restart loki
 
 - name: "[loki] Generate docker-compose"
-  template:
+  ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ monitoring_base_dir }}/loki/docker-compose.yml"
     backup: true
@@ -55,14 +57,14 @@
     state: present
 
 - name: "[loki] Chờ Loki sẵn sàng"
-  uri:
+  ansible.builtin.uri:
     url: "http://localhost:{{ loki_port }}/ready"
     status_code: 200
+  ignore_errors: true
   retries: 15
   delay: 5
   register: loki_health
 
 - name: "[loki] ✅ Loki OK trên {{ inventory_hostname }}"
-  debug:
+  ansible.builtin.debug:
     msg: "Loki running at {{ ansible_host }}:{{ loki_port }}"
-

@@ -1,4 +1,8 @@
-﻿---
+---
 # roles/alertmanager/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+alertmanager_version: "v0.28.0"
+alertmanager_port: 9093
+alertmanager_cluster_port: 9094
+alertmanager_data_path: "/data/alertmanager"

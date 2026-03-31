@@ -1,0 +1,11 @@
+---
+# playbooks/reconfig/all.yml
+# Reconfig toàn bộ hệ thống (no downtime)
+# v6.0 — Stack reconfig
+
+- import_playbook: monitoring.yml
+- import_playbook: grafana.yml
+- import_playbook: logging.yml
+- import_playbook: alertmanager.yml
+- import_playbook: haproxy.yml
+- import_playbook: exporters.yml

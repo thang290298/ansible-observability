@@ -1,4 +1,3 @@
-﻿---
 # vmagent scrape config — auto-generated từ inventory
 # Tất cả groups trong exporters được scrape tự động
 # Thêm client mới: chỉ thêm vào targets/*.yml rồi ./run.sh reconfig
@@ -65,7 +64,7 @@ scrape_configs:
 
   - job_name: promtail
     static_configs:
-{% for host in groups['promtail_nodes'] %}
+{% for host in groups.get('promtail_nodes', []) %}
       - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ promtail_port }}"]
         labels:
           instance: "{{ host }}"
@@ -74,16 +73,21 @@ scrape_configs:
 {% endfor %}
 
   - job_name: minio
+    metrics_path: /minio/v2/metrics/cluster
+    bearer_token: "{{ minio_prometheus_token | default('') }}"
     static_configs:
-{% for host in groups['monitoring_loki'] %}
+{% for host in groups['monitoring_minio'] | default(groups['monitoring_loki']) %}
       - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ minio_api_port }}"]
         labels:
           instance: "{{ host }}"
           component: minio
 {% endfor %}
-    metrics_path: /minio/v2/metrics/cluster
 
   - job_name: haproxy
+    metrics_path: /metrics
+    basic_auth:
+      username: "{{ haproxy_stats_user }}"
+      password: "{{ haproxy_stats_password }}"
     static_configs:
 {% for host in groups['monitoring_lb'] %}
       - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ haproxy_stats_port }}"]
@@ -91,8 +95,6 @@ scrape_configs:
           instance: "{{ host }}"
           component: haproxy
 {% endfor %}
-    params:
-      stats: [prometheus]
 
   - job_name: vmagent
     static_configs:
@@ -157,12 +159,12 @@ scrape_configs:
       - source_labels: [dst_node]
         target_label: dst_node
       - target_label: __address__
-        replacement: "{{ hostvars[groups['monitoring_lb'][0]]['ansible_host'] }}:9115"
+        replacement: "{{ vip_address }}:{{ blackbox_exporter_port }}"
 
   - job_name: "blackbox"
     static_configs:
-{% for host in groups['monitoring_lb'] %}
-      - targets: ["{{ hostvars[host]['ansible_host'] }}:9115"]
+      - targets: ["{{ vip_address }}:{{ blackbox_exporter_port }}"]
         labels:
-          instance: "{{ host }}"
-{% endfor %}
+          instance: "blackbox-vip"
+          component: blackbox
+

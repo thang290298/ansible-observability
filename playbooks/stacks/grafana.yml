@@ -1,0 +1,19 @@
+---
+# playbooks/stacks/grafana.yml
+# Deploy Grafana stack: postgresql → grafana
+# v6.0 — Stack-based deployment
+
+- name: "🗄️  [grafana/01] PostgreSQL — monitoring_db"
+  hosts: monitoring_db
+  become: true
+  gather_facts: false
+  tags: [postgresql, db]
+  roles: [postgresql]
+
+- name: "📊 [grafana/02] Grafana — monitoring_grafana"
+  hosts: monitoring_grafana
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [grafana]
+  roles: [grafana]

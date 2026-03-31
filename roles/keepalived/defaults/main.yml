@@ -1,4 +1,8 @@
-﻿---
+---
 # roles/keepalived/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+keepalived_base_priority: 110
+keepalived_priority_step: 10
+vip_interface: "eth0"
+vrrp_router_id: 51

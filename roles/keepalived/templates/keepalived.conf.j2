@@ -28,7 +28,7 @@ vrrp_instance VI_MONITORING {
     }
 
     virtual_ipaddress {
-        {{ vip_address }}/24
+        {{ vip_address }}/{{ vip_prefix_len | default(24) }}
     }
 
     track_script {

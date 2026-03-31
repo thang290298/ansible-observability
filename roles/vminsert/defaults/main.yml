@@ -1,4 +1,7 @@
-﻿---
+---
 # roles/vminsert/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+vminsert_port: 8480
+vminsert_mem_limit: "1g"
+vminsert_cpu_limit: "1.0"

@@ -1,15 +1,8 @@
 ---
-- name: reload systemd
-  systemd:
-    daemon_reload: true
-
-- name: restart random-ping
-  systemd:
-    name: random-ping-targets
-    state: restarted
-
-- name: restart blackbox
+# roles/random_ping/handlers/main.yml
+- name: restart blackbox-random-ping
   community.docker.docker_compose_v2:
-    project_src: /opt/monitoring/random-ping
+    project_src: "{{ random_ping_dir | default('/opt/monitoring/blackbox-random-ping') }}"
     state: present
     recreate: always
+  become: true

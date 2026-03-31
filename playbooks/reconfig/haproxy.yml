@@ -1,0 +1,29 @@
+---
+# playbooks/reconfig/haproxy.yml
+# Reload HAProxy backends (no downtime)
+# v6.0 — Stack reconfig
+
+- name: "⚖️  [reconfig/haproxy] Reload HAProxy backends"
+  hosts: "{{ target_nodes | default(groups['monitoring_lb']) }}"
+  become: true
+  gather_facts: false
+  tags: [reconfig, haproxy]
+
+  tasks:
+    - name: "[reconfig/haproxy] Regenerate HAProxy config"
+      ansible.builtin.template:
+        src: "{{ playbook_dir }}/../../roles/haproxy/templates/haproxy.cfg.j2"
+        dest: /etc/haproxy/haproxy.cfg
+        backup: true
+        validate: "haproxy -c -f %s"
+      register: haproxy_config_updated
+
+    - name: "[reconfig/haproxy] Graceful reload HAProxy"
+      ansible.builtin.systemd:
+        name: haproxy
+        state: reloaded
+      when: haproxy_config_updated.changed
+
+    - name: "[reconfig/haproxy] ✅ HAProxy status"
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}: HAProxy {{ 'reloaded' if haproxy_config_updated.changed else 'unchanged' }}"

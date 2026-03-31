@@ -1,4 +1,7 @@
-﻿---
+---
 # roles/haproxy/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+haproxy_version: "2.8"
+haproxy_stats_port: 8404
+haproxy_stats_user: "admin"

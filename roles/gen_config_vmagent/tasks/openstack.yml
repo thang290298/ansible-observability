@@ -1,0 +1,32 @@
+---
+# roles/gen_config_vmagent/tasks/openstack.yml
+# =============================================================================
+# Gen scrape_openstack_<site>.yml cho từng group trong openstack_groups
+# =============================================================================
+
+- name: "[gen_config/openstack] Gen scrape config cho từng openstack group"
+  vars:
+    _first_host: "{{ groups[target_group][0] }}"
+    _site: "{{ hostvars[_first_host].meta.site | default(hostvars[_first_host].site | default(target_group)) }}"
+    _output_file: "{{ gen_config_output_dir }}/scrape_openstack_{{ _site }}.yml"
+  ansible.builtin.template:
+    src: scrape_openstack.yml.j2
+    dest: "{{ _output_file }}"
+    owner: "{{ gen_config_file_owner }}"
+    group: "{{ gen_config_file_group }}"
+    mode: "{{ gen_config_file_mode }}"
+    backup: true
+  loop: "{{ openstack_groups }}"
+  loop_control:
+    loop_var: target_group
+    label: "{{ target_group }} → scrape_openstack_{{ hostvars[groups[target_group][0]].meta.site | default(target_group) }}.yml"
+  when:
+    - groups[target_group] is defined
+    - groups[target_group] | length > 0
+  register: openstack_config_result
+  tags: [gen_config, openstack]
+
+- name: "[gen_config/openstack] ✅ OpenStack scrape configs generated"
+  ansible.builtin.debug:
+    msg: "Generated {{ openstack_config_result.results | selectattr('changed') | list | length }} / {{ openstack_groups | length }} openstack scrape files"
+  tags: [gen_config, openstack]

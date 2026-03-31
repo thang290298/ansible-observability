@@ -1,0 +1,7 @@
+---
+# inventory/host_vars/cephssd01-dbp4.yml
+meta:
+  host: cephssd01-dbp4
+  ip: 10.167.52.81
+  site: dbp4
+  role: ceph

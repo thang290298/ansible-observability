@@ -1,67 +1,59 @@
 ---
 # roles/docker/tasks/main.yml
-# Cài Docker Engine trên tất cả monitoring nodes
+# Install Docker Engine via apt on Ubuntu
 
-- name: "[docker] Cài dependencies"
-  apt:
+- name: "[docker] Install prerequisites"
+  ansible.builtin.apt:
     name:
       - apt-transport-https
       - ca-certificates
       - curl
       - gnupg
-      - lsb-release
-      - python3-pip
     state: present
     update_cache: true
 
-# [FIX H4] Sử dụng get_url thay vì apt_key (deprecated từ Ansible 2.13+, Ubuntu 22.04+)
-- name: "[docker] Tạo thư mục keyrings"
-  file:
-    path: /usr/share/keyrings
+- name: "[docker] Create keyrings directory"
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
     state: directory
     mode: '0755'
 
 - name: "[docker] Download Docker GPG key"
-  get_url:
-    url: https://download.docker.com/linux/ubuntu/gpg
-    dest: /usr/share/keyrings/docker.asc
-    mode: '0644'
-    force: false
+  ansible.builtin.shell: |
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+  args:
+    creates: /etc/apt/keyrings/docker.gpg
 
-- name: "[docker] Thêm Docker repo với signed-by"
-  apt_repository:
-    repo: "deb [arch=amd64 signed-by=/usr/share/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+- name: "[docker] Add Docker repository"
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
     state: present
     filename: docker
+    update_cache: true
 
-- name: "[docker] Cài Docker Engine"
-  apt:
+- name: "[docker] Install Docker Engine"
+  ansible.builtin.apt:
     name:
-      - "docker-ce={{ docker_version | default('*') }}"
+      - docker-ce
       - docker-ce-cli
       - containerd.io
       - docker-compose-plugin
     state: present
-    update_cache: true
+    update_cache: false
 
-- name: "[docker] Cài Python Docker SDK (cho community.docker)"
-  pip:
-    name:
-      - docker
-      - docker-compose
+- name: "[docker] Install Python Docker SDK"
+  ansible.builtin.pip:
+    name: docker
     state: present
+    extra_args: "--break-system-packages"
 
 - name: "[docker] Enable + Start Docker"
-  systemd:
+  ansible.builtin.systemd:
     name: docker
     enabled: true
     state: started
 
 - name: "[docker] Verify Docker running"
-  command: docker info
-  register: docker_info
+  ansible.builtin.command: docker info
   changed_when: false
-
-- name: "[docker] ✅ Docker OK"
-  debug:
-    msg: "Docker running on {{ inventory_hostname }}"

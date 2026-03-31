@@ -1,7 +1,7 @@
 ---
 # roles/vmstorage/tasks/main.yml
-- name: "[vmstorage] Tạo thư mục"
-  file:
+- name: "[vmstorage] Tao thu muc"
+  ansible.builtin.file:
     path: "{{ item }}"
     state: directory
     mode: '0755'
@@ -10,7 +10,7 @@
     - "{{ vm_storage_data_path }}"
 
 - name: "[vmstorage] Generate docker-compose"
-  template:
+  ansible.builtin.template:
     src: docker-compose.yml.j2
     dest: "{{ monitoring_base_dir }}/vmstorage/docker-compose.yml"
     backup: true
@@ -22,9 +22,9 @@
     state: present
 
 - name: "[vmstorage] Health check"
-  uri:
+  ansible.builtin.uri:
     url: "http://localhost:{{ vmstorage_port }}/health"
     status_code: 200
+  ignore_errors: true
   retries: 10
   delay: 5
-

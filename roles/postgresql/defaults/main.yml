@@ -1,4 +1,7 @@
-﻿---
+---
 # roles/postgresql/defaults/main.yml
 # Role-level defaults - can be overridden by group_vars/all.yml or host_vars
 
+postgres_version: "15"
+postgres_port: 5432
+postgres_data_path: "/data/postgres"

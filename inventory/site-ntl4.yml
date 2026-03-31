@@ -1,0 +1,50 @@
+---
+# =============================================================================
+# inventory/site-ntl4.yml
+# Site NTL4 — Nam Thăng Long 4
+#
+# Cấu trúc group trong site:
+#   site_ntl4              Parent group toàn bộ site
+#   ├── compute_ntl4       Compute nodes (KVM/libvirt)
+#   └── controller_ntl4    OpenStack controller nodes
+#
+# Thêm server mới:
+#   1. Thêm host vào group phù hợp bên dưới
+#   2. Tạo file inventory/host_vars/<hostname>.yml (nếu có meta info)
+#   3. Chạy: ./run.sh node-exporter --limit <hostname>
+# =============================================================================
+
+site_ntl4:
+  vars:
+    site: ntl4
+    # Group vars chung cho toàn site — override tại group_vars/site_ntl4.yml
+
+  children:
+
+    # --------------------------------------------------------------------------
+    # Compute Nodes — NTL4
+    # Exporters: node_exporter (9100), libvirt (9177)
+    # --------------------------------------------------------------------------
+    compute_ntl4:
+      vars:
+        role: compute
+        cluster: smartcloud2022
+        libvirt_exporter_port: 9177
+      hosts:
+        compute01-ntl4: { ansible_host: 10.165.50.21 }
+        # compute02-ntl4: { ansible_host: 10.165.50.22 }
+        # compute03-ntl4: { ansible_host: 10.165.50.23 }
+
+    # --------------------------------------------------------------------------
+    # Controller Nodes — NTL4
+    # Exporters: node_exporter (9100), openstack-exporter (9180)
+    # --------------------------------------------------------------------------
+    controller_ntl4:
+      vars:
+        role: controller
+        cluster: smartcloud2022
+        openstack_exporter_port: 9180
+      hosts:
+        controller01-ntl4: { ansible_host: 10.165.50.10 }
+        # controller02-ntl4: { ansible_host: 10.165.50.11 }
+        # controller03-ntl4: { ansible_host: 10.165.50.12 }

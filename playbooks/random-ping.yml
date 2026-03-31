@@ -1,9 +1,0 @@
----
-# playbooks/random-ping.yml
-# Deploy Random Ping Monitoring (Blackbox Exporter + Target Rotator)
-- name: Deploy Random Ping Monitoring
-  hosts: monitoring_lb
-  become: true
-  roles:
-    - role: random_ping
-  tags: [random-ping, monitoring]

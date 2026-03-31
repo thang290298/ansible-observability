@@ -1,0 +1,56 @@
+---
+# playbooks/stacks/monitoring.yml
+# Deploy Monitoring stack: vmstorage → vminsert → vmselect → vmagent → alertmanager
+# v6.0 — Stack-based deployment
+
+- name: "💾 [monitoring/01] vmstorage — monitoring_storage"
+  hosts: monitoring_storage
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [vmstorage, vm]
+
+  pre_tasks:
+    - name: "[vmstorage] Verify cluster healthy trước khi proceed"
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}:{{ vmstorage_port }}/health"
+        status_code: 200
+      retries: 3
+      delay: 5
+      ignore_errors: true
+
+  roles: [vmstorage]
+
+- name: "🔄 [monitoring/02] vminsert + vmselect — monitoring_query"
+  hosts: monitoring_query
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [vmquery, vm]
+
+  pre_tasks:
+    - name: "[vmquery] Chờ vmstorage cluster ổn định"
+      ansible.builtin.uri:
+        url: "http://{{ hostvars[item]['ansible_host'] }}:{{ vmstorage_port }}/health"
+        status_code: 200
+      loop: "{{ groups['monitoring_storage'] }}"
+      retries: 12
+      delay: 5
+      run_once: true
+
+  roles: [vminsert, vmselect]
+
+- name: "🔔 [monitoring/03] vmagent — monitoring_vmagent"
+  hosts: monitoring_vmagent
+  become: true
+  gather_facts: false
+  tags: [vmagent]
+  roles: [vmagent]
+
+- name: "🚨 [monitoring/04] Alertmanager — monitoring_alertmanager"
+  hosts: monitoring_alertmanager
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [alertmanager]
+  roles: [alertmanager]
