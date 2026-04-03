@@ -87,6 +87,24 @@
   tags: [alertmanager]
   roles: [alertmanager]
 
+- name: "[09.5] vmalert — monitoring_vmalert"
+  hosts: monitoring_vmalert
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [vmalert]
+  pre_tasks:
+    - name: "[vmalert] Chờ Alertmanager healthy"
+      ansible.builtin.uri:
+        url: "http://{{ hostvars[item]['ansible_host'] }}:{{ alertmanager_internal_port | default(alertmanager_port) }}/-/healthy"
+        status_code: 200
+      loop: "{{ groups['monitoring_alertmanager'] }}"
+      retries: 10
+      delay: 5
+      run_once: true
+      ignore_errors: true
+  roles: [vmalert]
+
 - name: "[10] vmagent — monitoring_vmagent"
   hosts: monitoring_vmagent
   become: true

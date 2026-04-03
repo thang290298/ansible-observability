@@ -1,0 +1,18 @@
+---
+# roles/vmalert/handlers/main.yml
+
+- name: Restart vmalert
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/vmalert"
+    state: present
+    recreate: always
+  become: true
+
+- name: Reload vmalert rules
+  ansible.builtin.uri:
+    url: "http://localhost:{{ vmalert_internal_port | default(vmalert_port) }}/-/reload"
+    method: POST
+    status_code: [200, 204]
+  retries: 3
+  delay: 2
+  ignore_errors: true

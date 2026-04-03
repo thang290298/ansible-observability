@@ -1,0 +1,74 @@
+---
+# playbooks/reconfig/vmalert.yml
+# Reconfig vmalert — update alert rules + hot reload (không restart container)
+# Usage: ansible-playbook -i inventory playbooks/reconfig/vmalert.yml
+
+- name: "🚨 Reconfig vmalert rules"
+  hosts: monitoring_vmalert
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: [vmalert]
+
+  tasks:
+    - name: "[reconfig] Tìm alert rules files"
+      ansible.builtin.find:
+        paths: "{{ inventory_dir }}/../alert-rules"
+        patterns: "*.yml"
+        file_type: file
+      register: alert_rule_files
+      delegate_to: localhost
+      run_once: true
+
+    - name: "[reconfig] Copy alert rules"
+      ansible.builtin.copy:
+        src: "{{ item.path }}"
+        dest: "{{ monitoring_base_dir }}/vmalert/rules/{{ item.path | basename }}"
+        mode: '0644'
+        backup: true
+      loop: "{{ alert_rule_files.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      register: rules_updated
+
+    - name: "[reconfig] Tìm rules hiện có trên remote"
+      ansible.builtin.find:
+        paths: "{{ monitoring_base_dir }}/vmalert/rules"
+        patterns: "*.yml"
+        file_type: file
+      register: remote_rule_files
+
+    - name: "[reconfig] Xóa stale rules (không còn trong source)"
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ remote_rule_files.files | default([]) }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      when: item.path | basename not in (alert_rule_files.files | map(attribute='path') | map('basename') | list)
+      register: stale_removed
+
+    - name: "[reconfig] Reload vmalert (hot reload qua API)"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ vmalert_internal_port | default(vmalert_port) }}/-/reload"
+        method: POST
+        status_code: [200, 204]
+      when: rules_updated.changed or stale_removed.changed
+      retries: 3
+      delay: 2
+      ignore_errors: true
+
+    - name: "[reconfig] Verify rules loaded"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ vmalert_internal_port | default(vmalert_port) }}/api/v1/groups"
+        return_content: true
+      register: vmalert_groups
+      retries: 3
+      delay: 2
+      ignore_errors: true
+
+    - name: "[reconfig] ✅ Reconfig status"
+      ansible.builtin.debug:
+        msg: >-
+          {{ inventory_hostname }}: rules {{ 'updated + reloaded' if (rules_updated.changed or stale_removed.changed) else 'unchanged' }}
+          — groups: {{ (vmalert_groups.json.data.groups | default([])) | map(attribute='name') | list | default('N/A') }}

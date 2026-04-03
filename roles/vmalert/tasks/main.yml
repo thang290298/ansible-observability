@@ -1,0 +1,117 @@
+---
+# roles/vmalert/tasks/main.yml
+# Deploy vmalert — evaluate alert/recording rules, push alerts to Alertmanager
+
+- name: "[vmalert] Hien thi deploy info"
+  ansible.builtin.debug:
+    msg:
+      - "Deploying vmalert {{ vmalert_version }}"
+      - "Node: {{ inventory_hostname }} ({{ ansible_host }})"
+      - "HTTP port: {{ vmalert_port }}"
+      - "Datasource: {{ vmalert_datasource_url }}"
+      - "Notifiers: {{ vmalert_notifier_urls | join(', ') }}"
+      - "Evaluation interval: {{ vmalert_evaluation_interval }}"
+
+# ── INSTALL ──────────────────────────────────────────────────────────────────
+- name: "[vmalert] Tao thu muc config"
+  ansible.builtin.file:
+    path: "{{ monitoring_base_dir }}/vmalert"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: "[vmalert] Tao thu muc rules"
+  ansible.builtin.file:
+    path: "{{ monitoring_base_dir }}/vmalert/rules"
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: "[vmalert] Pull Docker image"
+  community.docker.docker_image:
+    name: "victoriametrics/vmalert:{{ vmalert_version }}"
+    source: pull
+  tags: [vmalert]
+
+# ── CONFIGURE ────────────────────────────────────────────────────────────────
+- name: "[vmalert] Tìm alert rules files"
+  ansible.builtin.find:
+    paths: "{{ inventory_dir }}/../alert-rules"
+    patterns: "*.yml"
+    file_type: file
+  register: alert_rule_files
+  delegate_to: localhost
+  run_once: true
+  tags: [vmalert, vmalert-rules]
+
+- name: "[vmalert] Copy alert rules"
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: "{{ monitoring_base_dir }}/vmalert/rules/{{ item.path | basename }}"
+    mode: '0644'
+    backup: true
+  loop: "{{ alert_rule_files.files }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  notify: Reload vmalert rules
+  tags: [vmalert, vmalert-rules]
+
+- name: "[vmalert] Tìm rules hiện có trên remote"
+  ansible.builtin.find:
+    paths: "{{ monitoring_base_dir }}/vmalert/rules"
+    patterns: "*.yml"
+    file_type: file
+  register: remote_rule_files
+  tags: [vmalert, vmalert-rules]
+
+- name: "[vmalert] Xóa stale rules (không còn trong source)"
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ remote_rule_files.files | default([]) }}"
+  loop_control:
+    label: "{{ item.path | basename }}"
+  when: item.path | basename not in (alert_rule_files.files | map(attribute='path') | map('basename') | list)
+  notify: Reload vmalert rules
+  tags: [vmalert, vmalert-rules]
+
+- name: "[vmalert] Generate docker-compose"
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "{{ monitoring_base_dir }}/vmalert/docker-compose.yml"
+    mode: '0644'
+    backup: true
+  notify: Restart vmalert
+  tags: [vmalert]
+
+# ── START SERVICE ─────────────────────────────────────────────────────────────
+- name: "[vmalert] Start vmalert"
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_base_dir }}/vmalert"
+    state: present
+  tags: [vmalert]
+
+- name: "[vmalert] Health check"
+  ansible.builtin.uri:
+    url: "http://localhost:{{ vmalert_internal_port | default(vmalert_port) }}/health"
+    status_code: 200
+  retries: 10
+  delay: 5
+  ignore_errors: true
+  tags: [vmalert]
+
+- name: "[vmalert] Verify rules loaded"
+  ansible.builtin.uri:
+    url: "http://localhost:{{ vmalert_internal_port | default(vmalert_port) }}/api/v1/groups"
+    return_content: true
+  register: vmalert_groups
+  retries: 5
+  delay: 3
+  ignore_errors: true
+  tags: [vmalert]
+
+- name: "[vmalert] Show loaded rule groups"
+  ansible.builtin.debug:
+    msg: "vmalert rules loaded: {{ (vmalert_groups.json.data.groups | default([])) | map(attribute='name') | list }}"
+  when: vmalert_groups is success
+  tags: [vmalert]

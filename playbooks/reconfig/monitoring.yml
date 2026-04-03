@@ -41,10 +41,10 @@
         msg: "{{ inventory_hostname }}: {{ reload_result.stdout | default('no change') }}"
 
 - name: "🚨 [reconfig/monitoring] Reload alert rules"
-  hosts: "{{ target_nodes | default(groups['monitoring_vmagent']) }}"
+  hosts: "{{ target_nodes | default(groups['monitoring_vmalert'] | default(groups['monitoring_vmagent'])) }}"
   become: true
   gather_facts: false
-  tags: [reconfig, alerts]
+  tags: [reconfig, alerts, vmalert]
 
   tasks:
     - name: "[reconfig] Tạo thư mục vmalert rules"
@@ -53,18 +53,52 @@
         state: directory
         mode: '0755'
 
+    - name: "[reconfig] Tìm alert rules files (source)"
+      ansible.builtin.find:
+        paths: "{{ inventory_dir }}/../alert-rules"
+        patterns: "*.yml"
+        file_type: file
+      register: alert_rule_files
+      delegate_to: localhost
+      run_once: true
+
     - name: "[reconfig] Copy alert rules"
       ansible.builtin.copy:
-        src: "{{ playbook_dir }}/../../alert-rules/"
-        dest: "{{ monitoring_base_dir }}/vmalert/rules/"
+        src: "{{ item.path }}"
+        dest: "{{ monitoring_base_dir }}/vmalert/rules/{{ item.path | basename }}"
         mode: '0644'
+      loop: "{{ alert_rule_files.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
       register: rules_updated
 
-    - name: "[reconfig] Reload vmagent/vmalert (SIGHUP)"
-      ansible.builtin.shell: |
-        docker kill --signal=SIGHUP vmagent 2>/dev/null || true
-      when: rules_updated.changed
+    - name: "[reconfig] Tìm rules hiện có trên remote"
+      ansible.builtin.find:
+        paths: "{{ monitoring_base_dir }}/vmalert/rules"
+        patterns: "*.yml"
+        file_type: file
+      register: remote_rule_files
+
+    - name: "[reconfig] Xóa stale rules"
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ remote_rule_files.files | default([]) }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      when: item.path | basename not in (alert_rule_files.files | map(attribute='path') | map('basename') | list)
+      register: stale_removed
+
+    - name: "[reconfig] Reload vmalert (hot reload qua API)"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ vmalert_internal_port | default(vmalert_port) }}/-/reload"
+        method: POST
+        status_code: [200, 204]
+      when: rules_updated.changed or stale_removed.changed
+      retries: 3
+      delay: 2
+      ignore_errors: true
 
     - name: "[reconfig] ✅ Alert rules reload status"
       ansible.builtin.debug:
-        msg: "{{ inventory_hostname }}: alert rules {{ 'updated' if rules_updated.changed else 'unchanged' }}"
+        msg: "{{ inventory_hostname }}: alert rules {{ 'updated + vmalert reloaded' if (rules_updated.changed or stale_removed.changed) else 'unchanged' }}"

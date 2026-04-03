@@ -98,6 +98,15 @@ all:
         obs02:
 
     # --------------------------------------------------------------------------
+    # vmalert — Evaluate alert/recording rules, push to Alertmanager
+    # HA: chạy trên nhiều nodes, Alertmanager gossip tự deduplicate
+    # --------------------------------------------------------------------------
+    monitoring_vmalert:
+      hosts:
+        obs01:
+        obs02:
+
+    # --------------------------------------------------------------------------
     # Grafana — Visualization
     # --------------------------------------------------------------------------
     monitoring_grafana:

@@ -28,6 +28,7 @@ all:
         monitoring_query:
         monitoring_grafana:
         monitoring_vmagent:
+        monitoring_vmalert:
         monitoring_alertmanager:
         monitoring_db:
         monitoring_loki:

@@ -1,0 +1,46 @@
+---
+# roles/vmalert/defaults/main.yml
+# =============================================================================
+# vmalert — Default variables
+# Override trong group_vars hoặc host_vars nếu cần
+# =============================================================================
+
+# Version — sync với VictoriaMetrics cluster
+vmalert_version: "{{ victoriametrics_version | regex_replace('-cluster$', '') }}"
+
+# Ports
+vmalert_port: 8880
+vmalert_internal_port: 18880
+
+# Paths
+vmalert_rules_path: "/etc/vmalert/rules"
+
+# Evaluate interval
+vmalert_evaluation_interval: "15s"
+
+# Datasource — query metrics từ vmselect local (internal port, tránh loop qua HAProxy)
+vmalert_datasource_url: "http://{{ ansible_host }}:{{ vmselect_internal_port }}/select/0/prometheus"
+
+# Remote write — ghi recording rules vào vminsert local (internal port)
+vmalert_remote_write_url: "http://{{ ansible_host }}:{{ vminsert_internal_port }}/insert/0/prometheus"
+
+# Remote read — đọc previous state sau restart (dùng local vmselect)
+vmalert_remote_read_url: "http://{{ ansible_host }}:{{ vmselect_internal_port }}/select/0/prometheus"
+
+# Notifier URLs — push alerts đến Alertmanager (trực tiếp internal port, KHÔNG có path prefix)
+vmalert_notifier_urls: >-
+  {{ groups['monitoring_alertmanager']
+     | map('extract', hostvars, 'ansible_host')
+     | map('regex_replace', '^', 'http://')
+     | map('regex_replace', '$', ':' + alertmanager_internal_port | string)
+     | list }}
+
+# Resource limits
+vmalert_mem_limit: "512m"
+vmalert_cpu_limit: "0.5"
+
+# External URL — cho link trong alert notifications
+vmalert_external_url: "http://{{ vip_address }}:{{ vmalert_port }}"
+
+# External labels — phân biệt khi chạy HA (nhiều vmalert instance)
+vmalert_external_label: "{{ inventory_hostname }}"

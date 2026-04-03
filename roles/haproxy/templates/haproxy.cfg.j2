@@ -116,6 +116,24 @@ backend loki_back
 {% endfor %}
 
 # =============================================================================
+# VMALERT — Alert/Recording rules UI
+# Group: monitoring_vmalert ({{ groups['monitoring_vmalert'] | default([]) | length }} nodes)
+# =============================================================================
+{% if groups['monitoring_vmalert'] | default([]) | length > 0 %}
+frontend vmalert_front
+    bind *:{{ vmalert_port }}
+    default_backend vmalert_back
+
+backend vmalert_back
+    balance roundrobin
+    option httpchk GET /health
+    http-check expect status 200
+{% for host in groups['monitoring_vmalert'] %}
+    server {{ host }} {{ hostvars[host]['ansible_host'] }}:{{ vmalert_internal_port | default(vmalert_port) }} check inter 5s fall 3 rise 2
+{% endfor %}
+{% endif %}
+
+# =============================================================================
 # VMAGENT UI
 # Group: monitoring_vmagent ({{ groups['monitoring_vmagent'] | length }} nodes)
 # =============================================================================

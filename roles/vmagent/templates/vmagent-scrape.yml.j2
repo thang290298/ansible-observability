@@ -105,6 +105,15 @@ scrape_configs:
           component: vmagent
 {% endfor %}
 
+  - job_name: vmalert
+    static_configs:
+{% for host in groups['monitoring_vmalert'] | default([]) %}
+      - targets: ["{{ hostvars[host]['ansible_host'] }}:{{ vmalert_internal_port | default(vmalert_port) }}"]
+        labels:
+          instance: "{{ host }}"
+          component: vmalert
+{% endfor %}
+
   # ==========================================================================
   # INFRASTRUCTURE NODES — từ targets/*.yml
   # File-based service discovery: thêm/xóa targets không cần restart vmagent

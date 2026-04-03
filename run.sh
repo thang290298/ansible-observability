@@ -371,6 +371,7 @@ do_help() {
     echo -e "  ${BOLD}Reconfig (no downtime):${NC}"
     echo -e "  ${CYAN}reconfig${NC}               Reconfig toàn bộ (interactive)"
     echo -e "  ${CYAN}reconfig-monitoring${NC}    Reload vmagent + alert rules"
+    echo -e "  ${CYAN}reconfig-vmalert${NC}       Reload vmalert rules"
     echo -e "  ${CYAN}reconfig-grafana${NC}       Reload Grafana datasources"
     echo -e "  ${CYAN}reconfig-logging${NC}       Reload Loki + Promtail"
     echo -e "  ${CYAN}reconfig-alertmanager${NC}  Reload Alertmanager"
@@ -496,6 +497,9 @@ case "$ACTION" in
         ;;
     reconfig-monitoring)
         run_playbook "reconfig/monitoring.yml" "Reconfig vmagent + alert rules"
+        ;;
+    reconfig-vmalert)
+        run_playbook "reconfig/vmalert.yml" "Reconfig vmalert rules"
         ;;
     reconfig-grafana)
         run_playbook "reconfig/grafana.yml" "Reconfig Grafana datasources"

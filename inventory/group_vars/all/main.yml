@@ -66,6 +66,7 @@ vminsert_port: 8480
 vmselect_port: 8481
 vmstorage_port: 8482
 vmagent_port:  8429
+vmalert_port:  8880
 
 # Internal ports (giao tiếp nội bộ container-to-container)
 # Offset để tránh conflict với HAProxy frontend ports
@@ -77,6 +78,7 @@ vmstorage_vmselect_port:   8401   # Port vmstorage lắng nghe cho vmselect
 alertmanager_internal_port: 19093
 loki_internal_port:        13100
 vmagent_internal_port:     18429
+vmalert_internal_port:     18880
 
 # Resource limits (override per host nếu cần)
 vmstorage_mem_limit: "4g"

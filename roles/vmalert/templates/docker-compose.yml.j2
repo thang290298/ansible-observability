@@ -1,0 +1,55 @@
+# =============================================================================
+# vmalert — Alert/Recording rules evaluator
+# Instance: {{ inventory_hostname }} ({{ ansible_host }})
+# Datasource: {{ vmalert_datasource_url }}
+# Notifiers: {{ vmalert_notifier_urls | join(', ') }}
+# HA: Chạy trên nhiều nodes, Alertmanager tự deduplicate qua gossip
+# =============================================================================
+
+services:
+
+  vmalert:
+    image: victoriametrics/vmalert:{{ vmalert_version }}
+    container_name: vmalert
+    hostname: "vmalert-{{ inventory_hostname }}"
+    restart: unless-stopped
+    command:
+      # ── RULES ──
+      - "--rule=/etc/vmalert/rules/*.yml"
+      - "--evaluationInterval={{ vmalert_evaluation_interval }}"
+
+      # ── DATASOURCE — Query metrics từ vmselect ──
+      - "--datasource.url={{ vmalert_datasource_url }}"
+
+      # ── NOTIFIERS — Push alerts đến Alertmanager cluster ──
+{% for url in vmalert_notifier_urls %}
+      - "--notifier.url={{ url }}"
+{% endfor %}
+
+      # ── REMOTE WRITE — Ghi recording rules results vào vminsert ──
+      - "--remoteWrite.url={{ vmalert_remote_write_url }}"
+
+      # ── REMOTE READ — Khôi phục state sau restart ──
+      - "--remoteRead.url={{ vmalert_remote_read_url }}"
+
+      # ── EXTERNAL ──
+      - "--external.url={{ vmalert_external_url }}"
+      - "--external.label=source={{ vmalert_external_label }}"
+
+      # ── HTTP ──
+      - "--httpListenAddr=:{{ vmalert_port }}"
+      - "--loggerLevel=INFO"
+    volumes:
+      - {{ monitoring_base_dir }}/vmalert/rules:{{ vmalert_rules_path }}:ro
+    ports:
+      - "{{ vmalert_internal_port | default(vmalert_port) }}:{{ vmalert_port }}"
+    mem_limit: "{{ vmalert_mem_limit }}"
+    cpus: "{{ vmalert_cpu_limit }}"
+    labels:
+      monitoring: "true"
+      component: "vmalert"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
