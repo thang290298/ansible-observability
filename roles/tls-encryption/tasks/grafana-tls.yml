@@ -1,0 +1,27 @@
+---
+# roles/tls-encryption/tasks/grafana-tls.yml
+# Enable TLS for Grafana
+
+- name: "[tls-grafana] Copy TLS certificates to Grafana config"
+  ansible.builtin.copy:
+    src: "{{ tls_cert_dir }}/{{ item }}"
+    dest: "{{ monitoring_base_dir }}/grafana/{{ item }}"
+    mode: '0600'
+  loop:
+    - "{{ services_tls.grafana.cert_file }}"
+    - "{{ services_tls.grafana.key_file }}"
+  tags: [tls, grafana]
+
+- name: "[tls-grafana] Update Grafana docker-compose with TLS"
+  ansible.builtin.template:
+    src: grafana-docker-compose-tls.yml.j2
+    dest: "{{ monitoring_base_dir }}/grafana/docker-compose-tls.yml"
+    mode: '0644'
+  tags: [tls, grafana]
+
+- name: "[tls-grafana] Update Grafana GF_SERVER_PROTOCOL to https"
+  ansible.builtin.template:
+    src: grafana-tls-env.sh.j2
+    dest: "{{ monitoring_base_dir }}/grafana/tls-env.sh"
+    mode: '0644'
+  tags: [tls, grafana]

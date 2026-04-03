@@ -1,0 +1,11 @@
+# Grafana TLS Environment Variables
+
+export GF_SERVER_PROTOCOL=https
+export GF_SERVER_CERT_FILE={{ services_tls.grafana.cert_file }}
+export GF_SERVER_CERT_KEY={{ services_tls.grafana.key_file }}
+export GF_SERVER_HTTP_PORT={{ services_tls.grafana.port }}
+export GF_SECURITY_COOKIE_SECURE=true
+export GF_SECURITY_COOKIE_SAMESITE=Lax
+
+# Require HTTPS
+export GF_SERVER_ENFORCE_DOMAIN=true

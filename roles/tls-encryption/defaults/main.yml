@@ -1,0 +1,83 @@
+---
+# roles/tls-encryption/defaults/main.yml
+# TLS/SSL encryption configuration for all services
+
+tls_enabled: true
+tls_enforcement: "require"  # require, prefer, optional
+
+# Certificate management
+tls_cert_provider: "self-signed"  # self-signed, cert-manager, vault
+tls_cert_validity_days: 365
+tls_cert_dir: "{{ monitoring_base_dir }}/certs"
+
+# Self-signed certificate defaults
+tls_self_signed:
+  enabled: "{{ tls_cert_provider == 'self-signed' }}"
+  country: "VN"
+  state: "HCM"
+  locality: "Ho Chi Minh"
+  organization: "Monitoring"
+  common_name: "{{ inventory_hostname }}"
+
+# Cert-manager integration (optional)
+cert_manager_enabled: false
+cert_manager_namespace: "cert-manager"
+cert_manager_issuer: "letsencrypt-prod"
+
+# TLS per-service
+services_tls:
+  prometheus:
+    enabled: true
+    port: 9443
+    cert_file: "prometheus.crt"
+    key_file: "prometheus.key"
+    
+  grafana:
+    enabled: true
+    port: 3443
+    cert_file: "grafana.crt"
+    key_file: "grafana.key"
+    
+  loki:
+    enabled: true
+    port: 3100
+    cert_file: "loki.crt"
+    key_file: "loki.key"
+    
+  vmalert:
+    enabled: true
+    port: 8443
+    cert_file: "vmalert.crt"
+    key_file: "vmalert.key"
+    
+  vmagent:
+    enabled: true
+    port: 8429
+    cert_file: "vmagent.crt"
+    key_file: "vmagent.key"
+    
+  alertmanager:
+    enabled: true
+    port: 9494
+    cert_file: "alertmanager.crt"
+    key_file: "alertmanager.key"
+    
+  haproxy:
+    enabled: true
+    port: 443
+    cert_file: "haproxy.crt"
+    key_file: "haproxy.key"
+
+# Mutual TLS (mTLS)
+mtls_enabled: false
+mtls_require_client_cert: false
+
+# TLS version
+tls_min_version: "1.2"
+tls_max_version: "1.3"
+
+# Cipher suites
+tls_cipher_suites:
+  - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+  - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+  - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"

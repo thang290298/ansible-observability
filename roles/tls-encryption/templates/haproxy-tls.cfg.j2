@@ -1,0 +1,27 @@
+# HAProxy TLS Frontend Configuration
+# Secure HTTPS endpoint with self-signed certificate
+
+global
+    ssl-default-bind-ciphers {{ tls_cipher_suites | join(':') }}
+    ssl-default-bind-options ssl-min-ver {{ tls_min_version | lower }}
+
+frontend https-in
+    bind *:{{ services_tls.haproxy.port }} ssl crt {{ services_tls.haproxy.cert_file }}.pem
+    mode http
+    
+    # HSTS header
+    http-response set-header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    
+    # Redirect HTTP to HTTPS
+    redirect scheme https code 301 if !{ ssl_fc }
+    
+    default_backend monitoring-services
+
+backend monitoring-services
+    balance roundrobin
+    option http-server-close
+    
+    server prometheus localhost:9090 check
+    server grafana localhost:3000 check
+    server loki localhost:3100 check
+    server alertmanager localhost:9093 check

@@ -1,0 +1,21 @@
+---
+# roles/tls-encryption/tasks/prometheus-tls.yml
+# Enable TLS for Prometheus
+
+- name: "[tls-prometheus] Copy TLS certificates to Prometheus config"
+  ansible.builtin.copy:
+    src: "{{ tls_cert_dir }}/{{ item }}"
+    dest: "{{ monitoring_base_dir }}/prometheus/{{ item }}"
+    mode: '0600'
+  loop:
+    - "{{ services_tls.prometheus.cert_file }}"
+    - "{{ services_tls.prometheus.key_file }}"
+  tags: [tls, prometheus]
+
+- name: "[tls-prometheus] Generate Prometheus TLS config"
+  ansible.builtin.template:
+    src: prometheus-tls.yml.j2
+    dest: "{{ monitoring_base_dir }}/prometheus/tls-config.yml"
+    mode: '0644'
+  notify: Reload Prometheus config
+  tags: [tls, prometheus]

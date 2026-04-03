@@ -1,0 +1,23 @@
+---
+# roles/tls-encryption/tasks/haproxy-tls.yml
+# Enable TLS for HAProxy (frontend)
+
+- name: "[tls-haproxy] Create HAProxy PEM certificate (combined cert + key)"
+  ansible.builtin.shell:
+    cmd: "cat {{ tls_cert_dir }}/{{ services_tls.haproxy.cert_file }} {{ tls_cert_dir }}/{{ services_tls.haproxy.key_file }} > {{ monitoring_base_dir }}/haproxy/{{ services_tls.haproxy.cert_file }}.pem && chmod 600 {{ monitoring_base_dir }}/haproxy/{{ services_tls.haproxy.cert_file }}.pem"
+  tags: [tls, haproxy]
+
+- name: "[tls-haproxy] Copy CA certificate to HAProxy"
+  ansible.builtin.copy:
+    src: "{{ tls_cert_dir }}/ca.crt"
+    dest: "{{ monitoring_base_dir }}/haproxy/ca.crt"
+    mode: '0644'
+  tags: [tls, haproxy]
+
+- name: "[tls-haproxy] Generate HAProxy TLS configuration"
+  ansible.builtin.template:
+    src: haproxy-tls.cfg.j2
+    dest: "{{ monitoring_base_dir }}/haproxy/tls-frontend.cfg"
+    mode: '0644'
+  notify: Restart haproxy
+  tags: [tls, haproxy]

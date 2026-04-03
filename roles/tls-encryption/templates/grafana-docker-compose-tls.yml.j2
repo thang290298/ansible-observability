@@ -1,0 +1,26 @@
+services:
+  grafana:
+    image: grafana/grafana:{{ grafana_version }}
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      GF_SERVER_PROTOCOL: https
+      GF_SERVER_CERT_FILE: /etc/grafana/{{ services_tls.grafana.cert_file }}
+      GF_SERVER_CERT_KEY: /etc/grafana/{{ services_tls.grafana.key_file }}
+      GF_SERVER_HTTP_PORT: "{{ services_tls.grafana.port }}"
+      GF_SERVER_ROOT_URL: "https://{{ vip_address }}:{{ services_tls.grafana.port }}"
+      GF_SECURITY_ADMIN_USER: "{{ grafana_admin_user }}"
+      GF_SECURITY_ADMIN_PASSWORD: "{{ grafana_admin_password }}"
+      # Force HTTPS redirect
+      GF_SERVER_ENFORCE_DOMAIN: "true"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_SECURITY_COOKIE_SAMESITE: "Lax"
+    volumes:
+      - ./{{ services_tls.grafana.cert_file }}:/etc/grafana/{{ services_tls.grafana.cert_file }}:ro
+      - ./{{ services_tls.grafana.key_file }}:/etc/grafana/{{ services_tls.grafana.key_file }}:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "{{ services_tls.grafana.port }}:{{ services_tls.grafana.port }}"
+
+volumes:
+  grafana-data:

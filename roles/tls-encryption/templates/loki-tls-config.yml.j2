@@ -1,0 +1,15 @@
+# Loki TLS Configuration
+# Server and client TLS settings
+
+server:
+  http_listen_port: {{ services_tls.loki.port }}
+  http_tls_config:
+    cert_file: {{ services_tls.loki.cert_file }}
+    key_file: {{ services_tls.loki.key_file }}
+    min_version: {{ tls_min_version }}
+    max_version: {{ tls_max_version }}
+
+# Client TLS for Loki
+client_tls_config:
+  ca_file: ca.crt
+  insecure_skip_verify: false

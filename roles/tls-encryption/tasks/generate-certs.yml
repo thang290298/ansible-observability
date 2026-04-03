@@ -1,0 +1,87 @@
+---
+# roles/tls-encryption/tasks/generate-certs.yml
+# Generate self-signed certificates for all services
+
+- name: "[tls-certs] Install openssl"
+  ansible.builtin.package:
+    name: openssl
+    state: present
+  become: true
+  tags: [tls, certs]
+
+- name: "[tls-certs] Generate CA certificate"
+  block:
+    - name: "[tls-certs] Generate CA private key"
+      community.crypto.openssl_privatekey:
+        path: "{{ tls_cert_dir }}/ca.key"
+        size: 4096
+        mode: '0600'
+      tags: [tls, certs, ca]
+
+    - name: "[tls-certs] Generate CA certificate"
+      community.crypto.x509_certificate:
+        path: "{{ tls_cert_dir }}/ca.crt"
+        privatekey_path: "{{ tls_cert_dir }}/ca.key"
+        provider: selfsigned
+        selfsigned_version: 3
+        common_name: "Monitoring CA"
+        organization_name: "{{ tls_self_signed.organization }}"
+        country_name: "{{ tls_self_signed.country }}"
+        days_valid: "{{ tls_cert_validity_days }}"
+        mode: '0644'
+      tags: [tls, certs, ca]
+
+  tags: [tls, certs]
+
+- name: "[tls-certs] Generate service certificates"
+  block:
+    - name: "[tls-certs] Generate {{ item.key }} private key"
+      community.crypto.openssl_privatekey:
+        path: "{{ tls_cert_dir }}/{{ item.value.key_file }}"
+        size: 2048
+        mode: '0600'
+      loop: "{{ services_tls | dict2items }}"
+      when: item.value.enabled | default(true)
+      tags: [tls, certs, services]
+
+    - name: "[tls-certs] Generate {{ item.key }} CSR"
+      community.crypto.openssl_csr:
+        path: "{{ tls_cert_dir }}/{{ item.key }}.csr"
+        privatekey_path: "{{ tls_cert_dir }}/{{ item.value.key_file }}"
+        common_name: "{{ item.key }}"
+        organization_name: "{{ tls_self_signed.organization }}"
+        country_name: "{{ tls_self_signed.country }}"
+        subject_alt_name:
+          - "DNS:{{ item.key }}"
+          - "DNS:{{ inventory_hostname }}"
+          - "DNS:localhost"
+          - "IP:127.0.0.1"
+      loop: "{{ services_tls | dict2items }}"
+      when: item.value.enabled | default(true)
+      tags: [tls, certs, csr]
+
+    - name: "[tls-certs] Sign {{ item.key }} certificate with CA"
+      community.crypto.x509_certificate:
+        path: "{{ tls_cert_dir }}/{{ item.value.cert_file }}"
+        csr_path: "{{ tls_cert_dir }}/{{ item.key }}.csr"
+        ownca_path: "{{ tls_cert_dir }}/ca.crt"
+        ownca_privatekey_path: "{{ tls_cert_dir }}/ca.key"
+        provider: ownca
+        ownca_version: 3
+        days_valid: "{{ tls_cert_validity_days }}"
+        mode: '0644'
+      loop: "{{ services_tls | dict2items }}"
+      when: item.value.enabled | default(true)
+      tags: [tls, certs, sign]
+
+  tags: [tls, certs, services]
+
+- name: "[tls-certs] Display certificate summary"
+  ansible.builtin.debug:
+    msg:
+      - "✓ Self-signed certificates generated"
+      - "  CA: {{ tls_cert_dir }}/ca.crt"
+      - "  Certificates: {{ tls_cert_dir }}/*.crt"
+      - "  Valid for: {{ tls_cert_validity_days }} days"
+      - "  ⚠️  Note: Self-signed certs - suitable for internal use only"
+  tags: [tls, certs, summary]

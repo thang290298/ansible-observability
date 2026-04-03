@@ -1,0 +1,21 @@
+---
+# roles/tls-encryption/tasks/loki-tls.yml
+# Enable TLS for Loki
+
+- name: "[tls-loki] Copy TLS certificates to Loki config"
+  ansible.builtin.copy:
+    src: "{{ tls_cert_dir }}/{{ item }}"
+    dest: "{{ monitoring_base_dir }}/loki/{{ item }}"
+    mode: '0600'
+  loop:
+    - "{{ services_tls.loki.cert_file }}"
+    - "{{ services_tls.loki.key_file }}"
+  tags: [tls, loki]
+
+- name: "[tls-loki] Generate Loki TLS configuration"
+  ansible.builtin.template:
+    src: loki-tls-config.yml.j2
+    dest: "{{ monitoring_base_dir }}/loki/tls-config.yml"
+    mode: '0644'
+  notify: Restart loki
+  tags: [tls, loki]

@@ -1,0 +1,62 @@
+---
+# roles/tls-encryption/tasks/main.yml
+# Setup TLS encryption across monitoring stack
+
+- name: "[tls] Create certificate directory"
+  ansible.builtin.file:
+    path: "{{ tls_cert_dir }}"
+    state: directory
+    mode: '0700'
+  tags: [tls, certs]
+
+- name: "[tls] Generate self-signed certificates"
+  ansible.builtin.include_tasks: generate-certs.yml
+  when: tls_cert_provider == "self-signed"
+  tags: [tls, certs, self-signed]
+
+- name: "[tls] Setup Prometheus TLS"
+  ansible.builtin.include_tasks: prometheus-tls.yml
+  when: services_tls.prometheus.enabled | default(true)
+  tags: [tls, prometheus]
+
+- name: "[tls] Setup Grafana TLS"
+  ansible.builtin.include_tasks: grafana-tls.yml
+  when: services_tls.grafana.enabled | default(true)
+  tags: [tls, grafana]
+
+- name: "[tls] Setup Loki TLS"
+  ansible.builtin.include_tasks: loki-tls.yml
+  when: services_tls.loki.enabled | default(true)
+  tags: [tls, loki]
+
+- name: "[tls] Setup vmagent TLS"
+  ansible.builtin.include_tasks: vmagent-tls.yml
+  when: services_tls.vmagent.enabled | default(true)
+  tags: [tls, vmagent]
+
+- name: "[tls] Setup HAProxy TLS"
+  ansible.builtin.include_tasks: haproxy-tls.yml
+  when: services_tls.haproxy.enabled | default(true)
+  tags: [tls, haproxy]
+
+- name: "[tls] Setup AlertManager TLS"
+  ansible.builtin.include_tasks: alertmanager-tls.yml
+  when: services_tls.alertmanager.enabled | default(true)
+  tags: [tls, alertmanager]
+
+- name: "[tls] Display TLS configuration summary"
+  ansible.builtin.debug:
+    msg:
+      - "✓ TLS Encryption Configuration Complete"
+      - "  Certificate provider: {{ tls_cert_provider }}"
+      - "  Certificate directory: {{ tls_cert_dir }}"
+      - "  TLS enforcement: {{ tls_enforcement }}"
+      - "  Minimum TLS version: {{ tls_min_version }}"
+      - "  Services with TLS:"
+      - "    - Prometheus: {{ services_tls.prometheus.enabled }}"
+      - "    - Grafana: {{ services_tls.grafana.enabled }}"
+      - "    - Loki: {{ services_tls.loki.enabled }}"
+      - "    - vmagent: {{ services_tls.vmagent.enabled }}"
+      - "    - HAProxy: {{ services_tls.haproxy.enabled }}"
+      - "    - AlertManager: {{ services_tls.alertmanager.enabled }}"
+  tags: [tls, summary]

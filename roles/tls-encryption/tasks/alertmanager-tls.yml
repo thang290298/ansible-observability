@@ -1,0 +1,21 @@
+---
+# roles/tls-encryption/tasks/alertmanager-tls.yml
+# Enable TLS for AlertManager
+
+- name: "[tls-alertmanager] Copy TLS certificates to AlertManager config"
+  ansible.builtin.copy:
+    src: "{{ tls_cert_dir }}/{{ item }}"
+    dest: "{{ monitoring_base_dir }}/alertmanager/{{ item }}"
+    mode: '0600'
+  loop:
+    - "{{ services_tls.alertmanager.cert_file }}"
+    - "{{ services_tls.alertmanager.key_file }}"
+  tags: [tls, alertmanager]
+
+- name: "[tls-alertmanager] Generate AlertManager TLS configuration"
+  ansible.builtin.template:
+    src: alertmanager-tls-config.yml.j2
+    dest: "{{ monitoring_base_dir }}/alertmanager/tls-config.yml"
+    mode: '0644'
+  notify: Restart alertmanager
+  tags: [tls, alertmanager]

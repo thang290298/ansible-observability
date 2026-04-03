@@ -1,0 +1,21 @@
+---
+# roles/tls-encryption/tasks/vmagent-tls.yml
+# Enable TLS for vmagent (scrape config endpoints)
+
+- name: "[tls-vmagent] Copy TLS certificates to vmagent config"
+  ansible.builtin.copy:
+    src: "{{ tls_cert_dir }}/{{ item }}"
+    dest: "{{ monitoring_base_dir }}/vmagent/{{ item }}"
+    mode: '0600'
+  loop:
+    - "{{ services_tls.vmagent.cert_file }}"
+    - "{{ services_tls.vmagent.key_file }}"
+  tags: [tls, vmagent]
+
+- name: "[tls-vmagent] Generate vmagent TLS scrape config"
+  ansible.builtin.template:
+    src: vmagent-tls-scrape.yml.j2
+    dest: "{{ monitoring_base_dir }}/vmagent/tls-scrape-config.yml"
+    mode: '0644'
+  notify: Restart vmagent
+  tags: [tls, vmagent]
