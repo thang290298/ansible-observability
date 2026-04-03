@@ -1,0 +1,33 @@
+---
+# roles/postgresql/tasks/preflight.yml
+# Pre-flight checks cho PostgreSQL HA deployment
+
+- name: "[postgresql] Pre-flight: Verify minimum 3 nodes for HA"
+  ansible.builtin.assert:
+    that:
+      - groups['monitoring_db'] | length >= 3
+    fail_msg: |
+      ✗ PostgreSQL HA requires minimum 3 nodes (Patroni quorum voting)
+        Current nodes: {{ groups['monitoring_db'] | length }}
+        Nodes: {{ groups['monitoring_db'] | join(', ') }}
+      
+      Patroni uses consensus for failover. With 2 nodes:
+        - If one goes down, remaining node can't achieve quorum
+        - Leader won't automatically step down
+      
+      SOLUTION: Add at least 1 more node to monitoring_db group
+    success_msg: |
+      ✓ PostgreSQL HA: {{ groups['monitoring_db'] | length }} nodes detected
+        Nodes: {{ groups['monitoring_db'] | join(', ') }}
+        Patroni can safely handle 1 node failure
+  run_once: true
+  tags: [postgresql, preflight]
+
+- name: "[postgresql] Pre-flight: Check Patroni port (8008)"
+  ansible.builtin.assert:
+    that:
+      - patroni_port is defined
+      - patroni_port | int > 0
+      - patroni_port | int < 65536
+    fail_msg: "Patroni port must be between 1-65535. Current: {{ patroni_port | default('undefined') }}"
+  tags: [postgresql, preflight]

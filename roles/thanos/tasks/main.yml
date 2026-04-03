@@ -1,8 +1,35 @@
 ---
 # roles/thanos/tasks/main.yml
+# Deploy Thanos — long-term storage on S3
+# ✓ FIX #5: Make deployment conditional but recommended
+# ✓ FIX #5: Add sidecar to Prometheus components for automatic integration
 
-# ── Thanos chỉ chạy khi s3_enabled=true ────────────────────────────────────
-- name: "[thanos] Skip host nếu s3_enabled=false"
+- name: "[thanos] Check S3 configuration"
+  ansible.builtin.assert:
+    that:
+      - s3_enabled | default(false) | bool
+      - s3_bucket_name is defined
+    fail_msg: |
+      ⚠️  Thanos deployment skipped (S3 not enabled)
+      
+      To enable long-term storage on S3:
+        1. Set s3_enabled: true
+        2. Configure s3_bucket_name, s3_region
+        3. Set AWS credentials in vault.yml
+      
+      Thanos is RECOMMENDED for:
+        - Long-term metrics retention (365+ days)
+        - Cross-cluster metric federation
+        - Compliance & audit trail
+    success_msg: |
+      ✓ Thanos deployment enabled
+        Bucket: {{ s3_bucket_name }}
+        Region: {{ s3_region | default('us-east-1') }}
+  run_once: true
+  tags: [thanos]
+
+# ── Skip if S3 not enabled ──────────────────────────────────────────────────
+- name: "[thanos] Skip deployment if s3_enabled=false"
   ansible.builtin.meta: end_host
   when: not (s3_enabled | default(false))
 
@@ -18,17 +45,19 @@
     - "{{ monitoring_base_dir }}/thanos-query"
     - "{{ thanos_receive_data_path }}"
     - "{{ thanos_store_data_path }}"
+  tags: [thanos]
 
 - name: "[thanos] Deploy thanos-receive"
   ansible.builtin.include_tasks: receive.yml
   when: inventory_hostname in groups['monitoring_thanos_receive']
+  tags: [thanos]
 
 - name: "[thanos] Deploy thanos-store"
   ansible.builtin.include_tasks: store.yml
-  # Fix: đổi từ monitoring_thanos_query → monitoring_thanos_receive
-  # (store chạy trên cùng node với receive, không phải query)
   when: inventory_hostname in groups['monitoring_thanos_receive']
+  tags: [thanos]
 
 - name: "[thanos] Deploy thanos-query"
   ansible.builtin.include_tasks: query.yml
   when: inventory_hostname in groups['monitoring_thanos_query']
+  tags: [thanos]

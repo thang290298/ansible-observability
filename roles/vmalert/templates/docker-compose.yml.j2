@@ -18,8 +18,13 @@ services:
       - "--rule=/etc/vmalert/rules/*.yml"
       - "--evaluationInterval={{ vmalert_evaluation_interval }}"
 
-      # ── DATASOURCE — Query metrics từ vmselect ──
+      # ── DATASOURCE — Query metrics từ vmselect hoặc Thanos ──
+      # Nằu S3 enabled: kế "
       - "--datasource.url={{ vmalert_datasource_url }}"
+{% if s3_enabled | default(false) %}
+      # ✓ ADDED: Optional Thanos datasource for long-term queries (FIX #5)
+      - "--datasource.url=http://thanos-query:10912"
+{% endif %}
 
       # ── NOTIFIERS — Push alerts đến Alertmanager cluster ──
 {% for url in vmalert_notifier_urls %}

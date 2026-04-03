@@ -1,5 +1,11 @@
 ---
 # roles/vmstorage/tasks/main.yml
+
+# ── PRE-FLIGHT CHECKS ────────────────────────────────────────────────────────
+- name: "[vmstorage] Run pre-flight replication validation"
+  ansible.builtin.include_tasks: preflight.yml
+  tags: [vmstorage, preflight]
+
 - name: "[vmstorage] Tao thu muc"
   ansible.builtin.file:
     path: "{{ item }}"

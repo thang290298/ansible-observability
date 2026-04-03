@@ -1,0 +1,59 @@
+# vmagent with Thanos sidecar for long-term storage
+# Group: monitoring_vmagent
+
+services:
+  vmagent:
+    image: victoriametrics/vmagent:{{ vmagent_version }}
+    container_name: vmagent
+    restart: unless-stopped
+    command:
+      - "--remoteWrite.url={{ vmagent_remote_write_url }}"
+      - "--promscrape.config=/etc/vmagent/scrape.yml"
+      - "--httpListenAddr=:{{ vmagent_port }}"
+    volumes:
+      - {{ vmagent_data_path }}:/vmagent-data
+      - /etc/vmagent/scrape.yml:/etc/vmagent/scrape.yml
+    ports:
+      - "{{ vmagent_internal_port | default(vmagent_port) }}:{{ vmagent_port }}"
+    mem_limit: "{{ vmagent_mem_limit }}"
+    cpus: "{{ vmagent_cpu_limit }}"
+    networks:
+      - monitoring
+    depends_on:
+      - thanos-sidecar
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ✓ ADDED: Thanos sidecar for S3 integration (FIX #5)
+  thanos-sidecar:
+    image: quay.io/thanos/thanos:{{ thanos_version }}
+    container_name: thanos-sidecar
+    restart: unless-stopped
+    command:
+      - sidecar
+      - "--tsdb.path=/prometheus"
+      - "--grpc-address=0.0.0.0:10901"
+      - "--prometheus.url=http://vmagent:{{ vmagent_port }}"
+      - "--objstore.config-file=/etc/thanos/objstore.yml"
+      - "--grpc-grace-period=30s"
+    volumes:
+      - {{ vmagent_data_path }}:/prometheus
+      - {{ monitoring_base_dir }}/vmagent/objstore.yml:/etc/thanos/objstore.yml:ro
+    ports:
+      - "10901:10901"
+    networks:
+      - monitoring
+    mem_limit: "512m"
+    cpus: "0.5"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+networks:
+  monitoring:
+    driver: bridge

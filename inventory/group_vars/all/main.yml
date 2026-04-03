@@ -144,11 +144,19 @@ grafana_vm_datasource_url:   "http://{{ vip_address }}:{{ vmselect_port }}/selec
 grafana_loki_datasource_url: "http://{{ vip_address }}:{{ loki_port }}"
 
 # =============================================================================
-# POSTGRESQL
+# POSTGRESQL with Patroni HA
 # =============================================================================
 postgres_port:      5432
 postgres_data_path: "/data/postgres"
 postgres_password:  "{{ vault_postgres_password }}"
+postgres_mem_limit: "1g"
+postgres_cpu_limit: "1.0"
+
+# Patroni HA failover (requires min 3 nodes + etcd3 DCS)
+enable_postgresql_ha: true
+patroni_port: 8008
+patroni_password: "{{ vault_patroni_password | default(vault_postgres_password) }}"
+etcd_password: "{{ vault_etcd_password | default('change_me_in_vault') }}"
 
 # =============================================================================
 # VMAGENT

@@ -1,0 +1,69 @@
+scope: postgres-cluster
+namespace: /postgres
+name: {{ inventory_hostname }}
+
+restapi:
+  listen: 0.0.0.0:{{ patroni_port | default(8008) }}
+  connect_address: {{ ansible_host }}:{{ patroni_port | default(8008) }}
+  certfile: ''
+  keyfile: ''
+  authentication:
+    username: patroni
+    password: "{{ vault_patroni_password | default('change_me_in_vault') }}"
+
+etcd3:
+  # Use first etcd node as host — or dedicated etcd cluster if available
+  # For 3-node Patroni cluster: nodes elect leader via etcd consensus
+  host: "{{ groups['monitoring_db'][0] }}:2379"
+  username: root
+  password: "{{ vault_etcd_password | default('change_me_in_vault') }}"
+  protocol: http
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    maximum_lag_on_failover: 1048576
+    postgresql:
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+        shared_buffers: 256MB
+        wal_level: replica
+        max_wal_senders: 10
+        max_replication_slots: 10
+        hot_standby: 'on'
+        hot_standby_feedback: 'on'
+        wal_keep_segments: 64
+
+  pg_hba:
+    - host replication replicator 127.0.0.1/32 md5
+    - host replication replicator ::1/128 md5
+    - host replication replicator 0.0.0.0/0 md5
+    - host all all 0.0.0.0/0 md5
+
+  users:
+    admin:
+      password: "{{ vault_postgres_password | default('change_me_in_vault') }}"
+      options:
+        - createrole
+        - createdb
+
+postgresql:
+  use_unix_socket: true
+  data_dir: /var/lib/postgresql/data
+  bin_dir: /usr/lib/postgresql/15/bin
+  pgpass: /var/lib/postgresql/.pgpass
+  authentication:
+    username: postgres
+    password: "{{ vault_postgres_password | default('change_me_in_vault') }}"
+  parameters:
+    unix_socket_directories: '/var/run/postgresql'
+  listen: 0.0.0.0:5432
+  connect_address: {{ ansible_host }}:5432
+
+tags:
+  nofailover: false
+  noloadbalance: false
+  watched: false

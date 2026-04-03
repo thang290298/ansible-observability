@@ -1,0 +1,22 @@
+type: TSDB
+grpc_listen_addr: ":10901"
+
+bucket:
+  type: s3
+  config:
+    bucket: "{{ s3_bucket_name }}"
+    endpoint: "{{ s3_endpoint | default('s3.amazonaws.com') }}"
+    region: "{{ s3_region | default('us-east-1') }}"
+    access_key: "{{ vault_s3_access_key }}"
+    secret_key: "{{ vault_s3_secret_key }}"
+    insecure: {{ s3_insecure | default('false') | lower }}
+
+tsdb:
+  path: "/prometheus"
+  retention_duration: "2h"  # Local retention; S3 keeps longer history
+
+# Retry S3 connectivity with backoff (FIX #4)
+retry:
+  enabled: true
+  backoff: 5m
+  max_retries: 3

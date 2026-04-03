@@ -1,0 +1,37 @@
+---
+# roles/prometheus-sidecar/tasks/main.yml
+# Deploy Thanos sidecar for Prometheus — integrate long-term S3 storage
+
+- name: "[prometheus-sidecar] Skip if S3/Thanos not enabled"
+  ansible.builtin.meta: end_host
+  when: not (s3_enabled | default(false))
+
+- name: "[prometheus-sidecar] Generate Thanos sidecar config"
+  ansible.builtin.template:
+    src: thanos-sidecar.yml.j2
+    dest: "{{ monitoring_base_dir }}/vmagent/thanos-sidecar.yml"
+    mode: '0644'
+    backup: true
+  notify: Restart vmagent
+  tags: [thanos, sidecar]
+
+- name: "[prometheus-sidecar] Update vmagent docker-compose to include sidecar"
+  block:
+    - name: "[prometheus-sidecar] Read current docker-compose"
+      ansible.builtin.slurp:
+        src: "{{ monitoring_base_dir }}/vmagent/docker-compose.yml"
+      register: compose_content
+
+    - name: "[prometheus-sidecar] Check if sidecar already configured"
+      ansible.builtin.set_fact:
+        sidecar_configured: "{{ 'thanos-sidecar' in compose_content.content | b64decode }}"
+
+    - name: "[prometheus-sidecar] Update docker-compose with sidecar (if needed)"
+      ansible.builtin.template:
+        src: docker-compose-with-sidecar.yml.j2
+        dest: "{{ monitoring_base_dir }}/vmagent/docker-compose.yml"
+        mode: '0644'
+        backup: true
+      notify: Restart vmagent
+      when: not sidecar_configured
+  tags: [thanos, sidecar]

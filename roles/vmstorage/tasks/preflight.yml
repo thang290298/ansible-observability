@@ -1,0 +1,42 @@
+---
+# roles/vmstorage/tasks/preflight.yml
+# Pre-flight checks for VictoriaMetrics storage cluster
+
+- name: "[vmstorage] Pre-flight: Validate replication factor vs node count"
+  block:
+    - name: "[vmstorage] Get node count from inventory"
+      ansible.builtin.set_fact:
+        storage_node_count: "{{ groups['monitoring_storage'] | length }}"
+
+    - name: "[vmstorage] Assert: RF=2 requires min 3 nodes"
+      ansible.builtin.assert:
+        that:
+          - "storage_node_count | int >= vm_replication_factor | int + 1"
+        fail_msg: |
+          ✗ UNSAFE VMSTORAGE CONFIGURATION DETECTED!
+          
+          Replication Factor: {{ vm_replication_factor }}
+          Available Nodes: {{ storage_node_count }}
+          
+          RULE: RF=N requires minimum N+1 nodes for safety
+          
+          Current state is UNSAFE because:
+            - With RF=2 + 2 nodes: if 1 node fails, data is lost
+            - With RF=2 + 3 nodes: if 1 node fails, data still replicated to 2 other nodes
+          
+          FIX: Add at least {{ vm_replication_factor | int - storage_node_count | int + 2 }} more node(s) to monitoring_storage group
+          OR: Reduce vm_replication_factor to {{ storage_node_count | int - 1 }}
+        success_msg: |
+          ✓ Replication safe: RF={{ vm_replication_factor }} on {{ storage_node_count }} nodes
+  run_once: true
+  tags: [vmstorage, preflight]
+
+- name: "[vmstorage] Pre-flight: Check cluster connectivity (future nodes)"
+  ansible.builtin.debug:
+    msg: |
+      Replication Configuration:
+        - Replication Factor: {{ vm_replication_factor }}
+        - Storage Nodes: {{ storage_node_count }}
+        - Storage Node list: {{ groups['monitoring_storage'] | join(', ') }}
+  run_once: true
+  tags: [vmstorage, preflight]

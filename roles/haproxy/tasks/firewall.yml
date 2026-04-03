@@ -1,0 +1,55 @@
+---
+# roles/haproxy/tasks/firewall.yml
+# Security hardening: firewall rules for HAProxy stats endpoint
+
+- name: "[haproxy] Security: Add firewall rule to restrict stats access"
+  block:
+    - name: "[haproxy] Check if UFW is installed"
+      ansible.builtin.command: which ufw
+      register: ufw_check
+      failed_when: false
+      changed_when: false
+
+    - name: "[haproxy] UFW: Allow stats only from monitoring VIP subnet"
+      community.general.ufw:
+        rule: allow
+        port: "{{ haproxy_stats_port }}"
+        proto: tcp
+        from_ip: "{{ vip_address }}/32"
+        comment: "HAProxy stats endpoint - restricted access"
+      become: true
+      when: ufw_check.rc == 0
+      ignore_errors: true
+
+    - name: "[haproxy] UFW: Allow stats from localhost"
+      community.general.ufw:
+        rule: allow
+        port: "{{ haproxy_stats_port }}"
+        proto: tcp
+        from_ip: "127.0.0.1/32"
+        comment: "HAProxy stats endpoint - localhost access"
+      become: true
+      when: ufw_check.rc == 0
+      ignore_errors: true
+
+    - name: "[haproxy] Check if firewalld is active"
+      ansible.builtin.systemd:
+        name: firewalld
+        enabled: true
+      register: firewalld_check
+      failed_when: false
+      changed_when: false
+      become: true
+
+    - name: "[haproxy] firewalld: Restrict stats port to monitoring subnet"
+      ansible.posix.firewalld:
+        rich_rule: "rule family='ipv4' source address='{{ vip_address }}/32' port protocol='tcp' port='{{ haproxy_stats_port }}' accept"
+        permanent: true
+        state: enabled
+        immediate: true
+      become: true
+      when: 
+        - firewalld_check.rc is defined
+        - firewalld_check.rc == 0
+      ignore_errors: true
+  tags: [haproxy, firewall, security]

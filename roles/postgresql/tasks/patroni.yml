@@ -1,0 +1,58 @@
+---
+# roles/postgresql/tasks/patroni.yml
+# Deploy Patroni for PostgreSQL HA — automatic failover + leader election
+
+- name: "[postgresql] Create Patroni config directory"
+  ansible.builtin.file:
+    path: "{{ monitoring_base_dir }}/postgresql/patroni"
+    state: directory
+    mode: '0755'
+  become: true
+  tags: [postgresql, patroni]
+
+- name: "[postgresql] Generate Patroni YAML config"
+  ansible.builtin.template:
+    src: patroni.yml.j2
+    dest: "{{ monitoring_base_dir }}/postgresql/patroni.yml"
+    mode: '0644'
+    backup: true
+  notify: Restart postgresql
+  tags: [postgresql, patroni]
+
+- name: "[postgresql] Update docker-compose with Patroni env"
+  block:
+    - name: "[postgresql] Read current docker-compose"
+      ansible.builtin.slurp:
+        src: "{{ monitoring_base_dir }}/postgresql/docker-compose.yml"
+      register: compose_file
+
+    - name: "[postgresql] Check if Patroni already in compose"
+      ansible.builtin.set_fact:
+        patroni_already_set: "{{ 'PATRONI_' in compose_file.content | b64decode }}"
+
+    - name: "[postgresql] Update docker-compose with Patroni support (if needed)"
+      ansible.builtin.template:
+        src: docker-compose-patroni.yml.j2
+        dest: "{{ monitoring_base_dir }}/postgresql/docker-compose.yml"
+        mode: '0644'
+        backup: true
+      notify: Restart postgresql
+      when: not patroni_already_set
+  tags: [postgresql, patroni]
+
+- name: "[postgresql] Verify Patroni REST API ready"
+  ansible.builtin.uri:
+    url: "http://localhost:{{ patroni_port | default(8008) }}/cluster"
+    status_code: 200
+  retries: 20
+  delay: 5
+  register: patroni_cluster_info
+  ignore_errors: true
+  until: patroni_cluster_info.status == 200
+  tags: [postgresql, patroni, verify]
+
+- name: "[postgresql] Display Patroni cluster status"
+  ansible.builtin.debug:
+    msg: "{{ patroni_cluster_info.json | default({}) }}"
+  when: patroni_cluster_info.status == 200
+  tags: [postgresql, patroni, verify]

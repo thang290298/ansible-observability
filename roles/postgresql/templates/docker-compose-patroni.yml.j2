@@ -1,0 +1,78 @@
+# postgresql with Patroni HA — automatic failover support
+# Group: monitoring_db ({{ groups['monitoring_db'] | length }} nodes)
+# Leader elected via etcd consensus
+
+services:
+  postgresql:
+    image: patroni:{{ postgres_version }}
+    # patroni is 3rd-party Ubuntu image with Patroni + PostgreSQL pre-installed
+    # https://hub.docker.com/r/patroni/patroni
+    container_name: postgresql
+    restart: unless-stopped
+    
+    environment:
+      PATRONI_SCOPE: postgres-cluster
+      PATRONI_NAMESPACE: /postgres
+      PATRONI_NAME: {{ inventory_hostname }}
+      
+      PATRONI_RESTAPI_LISTEN: 0.0.0.0:{{ patroni_port | default(8008) }}
+      PATRONI_RESTAPI_CONNECT_ADDRESS: {{ ansible_host }}:{{ patroni_port | default(8008) }}
+      PATRONI_RESTAPI_USERNAME: patroni
+      PATRONI_RESTAPI_PASSWORD: "{{ vault_patroni_password | default('change_me') }}"
+      
+      # etcd3 backend for DCS (Distributed Configuration Store)
+      PATRONI_DCS: etcd3
+      PATRONI_ETCD3_HOST: "{{ groups['monitoring_db'][0] }}:2379"
+      PATRONI_ETCD3_USERNAME: root
+      PATRONI_ETCD3_PASSWORD: "{{ vault_etcd_password | default('change_me') }}"
+      
+      PATRONI_POSTGRESQL_USERNAME: postgres
+      PATRONI_POSTGRESQL_PASSWORD: "{{ vault_postgres_password | default('change_me') }}"
+      PATRONI_POSTGRESQL_DATA_DIR: /var/lib/postgresql/data
+      PATRONI_POSTGRESQL_BIN_DIR: /usr/lib/postgresql/15/bin
+      PATRONI_POSTGRESQL_CONNECT_ADDRESS: {{ ansible_host }}:5432
+      PATRONI_POSTGRESQL_LISTEN: 0.0.0.0:5432
+      
+      PATRONI_POSTGRESQL_PARAMETERS_SHARED_BUFFERS: 256MB
+      PATRONI_POSTGRESQL_PARAMETERS_WAL_LEVEL: replica
+      PATRONI_POSTGRESQL_PARAMETERS_MAX_WAL_SENDERS: "10"
+      PATRONI_POSTGRESQL_PARAMETERS_MAX_REPLICATION_SLOTS: "10"
+      PATRONI_POSTGRESQL_PARAMETERS_HOT_STANDBY: "on"
+      PATRONI_POSTGRESQL_PARAMETERS_HOT_STANDBY_FEEDBACK: "on"
+      PATRONI_POSTGRESQL_PARAMETERS_WAL_KEEP_SIZE: 1GB
+    
+    volumes:
+      - {{ postgres_data_path }}:/var/lib/postgresql/data
+      - {{ monitoring_base_dir }}/postgresql/patroni.yml:/etc/patroni/patroni.yml:ro
+    
+    ports:
+      - "{{ postgres_port }}:5432"
+      - "{{ patroni_port | default(8008) }}:{{ patroni_port | default(8008) }}"
+    
+    mem_limit: "{{ postgres_mem_limit | default('1g') }}"
+    cpus: "{{ postgres_cpu_limit | default('1.0') }}"
+    
+    networks:
+      - monitoring
+    
+    labels:
+      monitoring: "true"
+      component: "postgresql"
+      ha: "patroni"
+    
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+    
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  monitoring:
+    driver: bridge

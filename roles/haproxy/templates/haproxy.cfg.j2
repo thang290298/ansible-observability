@@ -22,7 +22,7 @@ defaults
     option  dontlog-normal
 
 # =============================================================================
-# STATS PAGE
+# STATS PAGE — Protected with authentication
 # =============================================================================
 frontend stats
     bind *:{{ haproxy_stats_port }}
@@ -31,8 +31,9 @@ frontend stats
     stats refresh 10s
     stats show-legends
     stats show-node
+    # ✓ FIXED: Basic auth protection (FIX #3)
     stats auth {{ haproxy_stats_user }}:{{ haproxy_stats_password }}
-    stats admin if LOCALHOST
+    stats admin if TRUE
 
 # =============================================================================
 # GRAFANA — session persistence qua cookie

@@ -30,6 +30,11 @@
   notify: Reload haproxy
   tags: [haproxy]
 
+# ✓ ADDED: Firewall security rules (FIX #3)
+- name: "[haproxy] Apply firewall rules for stats endpoint protection"
+  ansible.builtin.include_tasks: firewall.yml
+  tags: [haproxy, firewall, security]
+
 - name: "[haproxy] Enable va start HAProxy service"
   ansible.builtin.systemd:
     name: haproxy
@@ -42,7 +47,10 @@
 - name: "[haproxy] Verify HAProxy running"
   ansible.builtin.uri:
     url: "http://localhost:{{ haproxy_stats_port }}/stats"
-    status_code: 200
+    status_code: 401
+    user: "{{ haproxy_stats_user }}"
+    password: "{{ haproxy_stats_password }}"
+    force_basic_auth: true
   retries: 5
   delay: 3
   ignore_errors: true

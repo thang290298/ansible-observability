@@ -3,6 +3,11 @@
 # Deploy Loki cluster — đọc & lưu logs
 # Chạy trên: monitoring_loki group (mặc định node01 + node02)
 
+# ── S3 PREFLIGHT CHECKS ────────────────────────────────────────────────────────
+- name: "[loki] Run S3 bucket & IAM validation (FIX #4)"
+  ansible.builtin.include_tasks: s3-preflight.yml
+  tags: [loki, s3, preflight]
+
 - name: "[loki] Hiển thị cấu hình"
   ansible.builtin.debug:
     msg: |

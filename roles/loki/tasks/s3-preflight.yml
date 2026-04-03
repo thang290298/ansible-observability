@@ -1,0 +1,118 @@
+---
+# roles/loki/tasks/s3-preflight.yml
+# Pre-flight checks for Loki S3 backend — bucket validation + IAM verification
+
+- name: "[loki] S3 Preflight: Skip if S3 not enabled"
+  ansible.builtin.meta: end_host
+  when: not (s3_enabled | default(false))
+
+- name: "[loki] S3 Preflight: Validate S3 bucket name"
+  ansible.builtin.assert:
+    that:
+      - s3_bucket_name is defined
+      - s3_bucket_name | length > 0
+    fail_msg: |
+      ✗ S3 bucket name not defined
+      
+      Set s3_bucket_name in group_vars or inventory
+      Example: s3_bucket_name: "monitoring-logs-prod"
+  tags: [loki, s3, preflight]
+
+- name: "[loki] S3 Preflight: Install AWS CLI for bucket validation"
+  ansible.builtin.package:
+    name: awscli
+    state: present
+  become: true
+  tags: [loki, s3, preflight]
+
+- name: "[loki] S3 Preflight: Test S3 bucket connectivity"
+  block:
+    - name: "[loki] Check S3 bucket exists"
+      ansible.builtin.command:
+        cmd: "aws s3 ls s3://{{ s3_bucket_name }} --region {{ s3_region | default('us-east-1') }}"
+      environment:
+        AWS_ACCESS_KEY_ID: "{{ vault_s3_access_key }}"
+        AWS_SECRET_ACCESS_KEY: "{{ vault_s3_secret_key }}"
+      register: s3_bucket_check
+      retries: 3
+      delay: 5
+      until: s3_bucket_check.rc == 0
+      ignore_errors: true
+      tags: [loki, s3, preflight]
+
+    - name: "[loki] Assert S3 bucket accessible"
+      ansible.builtin.assert:
+        that:
+          - s3_bucket_check.rc == 0
+        fail_msg: |
+          ✗ S3 BUCKET NOT ACCESSIBLE
+          
+          Bucket: {{ s3_bucket_name }}
+          Region: {{ s3_region | default('us-east-1') }}
+          
+          Possible reasons:
+            1. Bucket doesn't exist — create it first
+            2. Wrong AWS credentials in vault_s3_access_key / vault_s3_secret_key
+            3. IAM user doesn't have s3:ListBucket permission
+            4. Wrong S3 region specified
+          
+          TEST COMMAND:
+            aws s3 ls s3://{{ s3_bucket_name }} --region {{ s3_region | default('us-east-1') }}
+        success_msg: "✓ S3 bucket {{ s3_bucket_name }} is accessible"
+      tags: [loki, s3, preflight]
+
+    - name: "[loki] Check IAM permissions (s3:GetObject, s3:PutObject)"
+      block:
+        - name: "[loki] Test S3 write permission"
+          ansible.builtin.shell:
+            cmd: |
+              aws s3 cp /dev/null \
+                s3://{{ s3_bucket_name }}/loki-preflight-test.txt \
+                --region {{ s3_region | default('us-east-1') }} && \
+              aws s3 rm \
+                s3://{{ s3_bucket_name }}/loki-preflight-test.txt \
+                --region {{ s3_region | default('us-east-1') }}
+          environment:
+            AWS_ACCESS_KEY_ID: "{{ vault_s3_access_key }}"
+            AWS_SECRET_ACCESS_KEY: "{{ vault_s3_secret_key }}"
+          register: s3_write_test
+          failed_when: false
+          changed_when: false
+          tags: [loki, s3, preflight]
+
+        - name: "[loki] Assert IAM write permission"
+          ansible.builtin.assert:
+            that:
+              - s3_write_test.rc == 0
+            fail_msg: |
+              ✗ IAM USER LACKS S3 WRITE PERMISSION
+              
+              Add s3:PutObject permission to IAM policy:
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket"
+                  ],
+                  "Resource": [
+                    "arn:aws:s3:::{{ s3_bucket_name }}",
+                    "arn:aws:s3:::{{ s3_bucket_name }}/*"
+                  ]
+                }
+            success_msg: "✓ IAM user has required S3 permissions (read/write/delete)"
+          tags: [loki, s3, preflight]
+      ignore_errors: true
+  run_once: true
+  tags: [loki, s3, preflight]
+
+- name: "[loki] S3 Preflight: Print successful S3 config"
+  ansible.builtin.debug:
+    msg: |
+      S3 Configuration Ready:
+        Bucket: {{ s3_bucket_name }}
+        Region: {{ s3_region | default('us-east-1') }}
+        Access Key: {{ vault_s3_access_key[:16] }}...
+  run_once: true
+  tags: [loki, s3, preflight]

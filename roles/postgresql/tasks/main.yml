@@ -1,7 +1,12 @@
 ---
 # roles/postgresql/tasks/main.yml
-# Deploy PostgreSQL — Backend database cho Grafana và Gitea
-# Chạy trên: monitoring_db group
+# Deploy PostgreSQL with Patroni HA — Backend database cho Grafana và Gitea
+# Chạy trên: monitoring_db group (min 3 nodes for failover)
+
+# ── PRE-FLIGHT CHECKS ────────────────────────────────────────────────────────
+- name: "[postgresql] Run pre-flight checks"
+  ansible.builtin.include_tasks: preflight.yml
+  tags: [postgresql, preflight]
 
 - name: "[postgresql] Hiển thị cấu hình"
   ansible.builtin.debug:
@@ -59,6 +64,13 @@
       when: docker_image_metadata.status is defined
 
 # ── CONFIGURE ────────────────────────────────────────────────────────────────
+
+- name: "[postgresql] Setup Patroni HA (if 3+ nodes)"
+  ansible.builtin.include_tasks: patroni.yml
+  when:
+    - groups['monitoring_db'] | length >= 3
+    - enable_postgresql_ha | default(true)
+  tags: [postgresql, patroni]
 
 - name: "[postgresql] Generate docker-compose"
   ansible.builtin.template:
