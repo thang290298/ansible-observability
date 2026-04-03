@@ -1,0 +1,35 @@
+---
+# roles/backup-strategy/tasks/postgresql.yml
+# PostgreSQL backup strategy - daily backups with retention policy
+
+- name: "[backup-postgresql] Create PostgreSQL backup directory"
+  ansible.builtin.file:
+    path: "{{ backup_base_dir }}/postgresql"
+    state: directory
+    mode: '0700'
+  tags: [backup, postgresql]
+
+- name: "[backup-postgresql] Generate PostgreSQL backup script"
+  ansible.builtin.template:
+    src: postgresql-backup.sh.j2
+    dest: "{{ backup_base_dir }}/postgresql/backup.sh"
+    mode: '0755'
+  tags: [backup, postgresql]
+
+- name: "[backup-postgresql] Setup PostgreSQL daily backup cron job"
+  ansible.builtin.cron:
+    name: "PostgreSQL daily backup"
+    hour: "{{ backup_schedule_hour }}"
+    minute: "{{ backup_schedule_minute }}"
+    job: "bash {{ backup_base_dir }}/postgresql/backup.sh >> {{ backup_base_dir }}/logs/postgresql.log 2>&1"
+    state: present
+    user: root
+  tags: [backup, postgresql, cron]
+
+- name: "[backup-postgresql] Create PostgreSQL backup monitoring alert"
+  ansible.builtin.template:
+    src: postgresql-backup-alert.yml.j2
+    dest: "{{ alert_rules_dir }}/postgresql-backup.yml"
+    mode: '0644'
+  when: alert_rules_dir is defined
+  tags: [backup, postgresql, alerts]

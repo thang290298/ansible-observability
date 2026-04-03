@@ -1,0 +1,35 @@
+---
+# roles/backup-strategy/tasks/loki.yml
+# Loki backup strategy - config snapshots + S3 data backup
+
+- name: "[backup-loki] Create Loki backup directory"
+  ansible.builtin.file:
+    path: "{{ backup_base_dir }}/loki"
+    state: directory
+    mode: '0700'
+  tags: [backup, loki]
+
+- name: "[backup-loki] Generate Loki config backup script"
+  ansible.builtin.template:
+    src: loki-backup-config.sh.j2
+    dest: "{{ backup_base_dir }}/loki/backup-config.sh"
+    mode: '0755'
+  tags: [backup, loki]
+
+- name: "[backup-loki] Setup Loki daily config backup cron job"
+  ansible.builtin.cron:
+    name: "Loki daily config backup"
+    hour: "{{ backup_schedule_hour }}"
+    minute: "{{ backup_schedule_minute | int + 20 }}"
+    job: "bash {{ backup_base_dir }}/loki/backup-config.sh >> {{ backup_base_dir }}/logs/loki.log 2>&1"
+    state: present
+    user: root
+  tags: [backup, loki, cron]
+
+- name: "[backup-loki] Create S3 data backup script (if S3 enabled)"
+  ansible.builtin.template:
+    src: loki-s3-backup.sh.j2
+    dest: "{{ backup_base_dir }}/loki/s3-backup.sh"
+    mode: '0755'
+  when: backup_to_s3 | default(false)
+  tags: [backup, loki, s3]

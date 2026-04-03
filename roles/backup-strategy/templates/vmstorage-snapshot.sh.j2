@@ -1,0 +1,42 @@
+#!/bin/bash
+# Vmstorage Snapshot Script
+# Create snapshot for point-in-time recovery
+
+set -e
+
+BACKUP_DIR="{{ backup_base_dir }}/vmstorage"
+VMSTORAGE_URL="http://localhost:{{ vmstorage_port | default(8482) }}"
+
+mkdir -p "$BACKUP_DIR"
+
+# Generate snapshot
+SNAPSHOT_NAME="vmstorage-snapshot-$(date +%Y%m%d-%H%M%S)"
+SNAPSHOT_DIR="$BACKUP_DIR/$SNAPSHOT_NAME"
+
+echo "[$(date)] Creating Vmstorage snapshot: $SNAPSHOT_NAME"
+
+# Create snapshot via Vmstorage API
+curl -s "$VMSTORAGE_URL/snapshot/create" > "$BACKUP_DIR/snapshot-response.json"
+
+# Check response
+if grep -q "snapshot" "$BACKUP_DIR/snapshot-response.json"; then
+    echo "[$(date)] Snapshot created successfully"
+    
+    # Extract snapshot path
+    SNAPSHOT_PATH=$(grep -o '"path":"[^"]*"' "$BACKUP_DIR/snapshot-response.json" | cut -d'"' -f4)
+    
+    # Optionally archive snapshot
+    if [ -n "$SNAPSHOT_PATH" ]; then
+        tar -czf "$SNAPSHOT_DIR.tar.gz" -C "/data" "vmstorage" 2>/dev/null || true
+        echo "[$(date)] Snapshot archived: $SNAPSHOT_DIR.tar.gz"
+    fi
+else
+    echo "[$(date)] ERROR: Failed to create snapshot"
+    cat "$BACKUP_DIR/snapshot-response.json"
+    exit 1
+fi
+
+# Cleanup old snapshots (keep last 7)
+ls -t "$BACKUP_DIR"/vmstorage-snapshot-*.tar.gz 2>/dev/null | tail -n +8 | xargs -r rm
+
+echo "[$(date)] Vmstorage snapshot completed"

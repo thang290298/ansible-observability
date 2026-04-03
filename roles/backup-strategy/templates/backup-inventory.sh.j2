@@ -1,0 +1,27 @@
+#!/bin/bash
+# Backup Inventory Script
+# List all available backups
+
+BACKUP_DIR="{{ backup_base_dir }}"
+
+echo "=== Backup Inventory Report ==="
+echo "Report date: $(date)"
+echo
+
+echo "PostgreSQL Backups:"
+ls -lh "$BACKUP_DIR/postgresql"/*.sql.* 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
+echo
+
+echo "Vmstorage Snapshots:"
+ls -lh "$BACKUP_DIR/vmstorage"/*.tar.gz 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
+echo
+
+echo "Loki Config Backups:"
+ls -lh "$BACKUP_DIR/loki"/*.tar.gz 2>/dev/null | awk '{print "  " $9 " (" $5 ")"}'
+echo
+
+echo "Storage Usage Summary:"
+du -sh "$BACKUP_DIR"/*/ | awk '{print "  " $2 ": " $1}'
+echo
+
+echo "=== End of Report ==="

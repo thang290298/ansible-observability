@@ -1,0 +1,34 @@
+---
+# roles/backup-strategy/tasks/vmstorage.yml
+# Vmstorage backup strategy - snapshots + retention
+
+- name: "[backup-vmstorage] Create Vmstorage backup directory"
+  ansible.builtin.file:
+    path: "{{ backup_base_dir }}/vmstorage"
+    state: directory
+    mode: '0700'
+  tags: [backup, vmstorage]
+
+- name: "[backup-vmstorage] Generate Vmstorage snapshot script"
+  ansible.builtin.template:
+    src: vmstorage-snapshot.sh.j2
+    dest: "{{ backup_base_dir }}/vmstorage/snapshot.sh"
+    mode: '0755'
+  tags: [backup, vmstorage]
+
+- name: "[backup-vmstorage] Setup Vmstorage daily snapshot cron job"
+  ansible.builtin.cron:
+    name: "Vmstorage daily snapshot"
+    hour: "{{ backup_schedule_hour }}"
+    minute: "{{ backup_schedule_minute | int + 10 }}"
+    job: "bash {{ backup_base_dir }}/vmstorage/snapshot.sh >> {{ backup_base_dir }}/logs/vmstorage.log 2>&1"
+    state: present
+    user: root
+  tags: [backup, vmstorage, cron]
+
+- name: "[backup-vmstorage] Create Vmstorage backup verification script"
+  ansible.builtin.template:
+    src: vmstorage-verify.sh.j2
+    dest: "{{ backup_base_dir }}/vmstorage/verify.sh"
+    mode: '0755'
+  tags: [backup, vmstorage]

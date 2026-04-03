@@ -1,0 +1,27 @@
+---
+# roles/backup-strategy/tasks/retention.yml
+# Backup retention and cleanup policy
+
+- name: "[backup-retention] Create backup retention script"
+  ansible.builtin.template:
+    src: backup-retention-cleanup.sh.j2
+    dest: "{{ backup_base_dir }}/retention-cleanup.sh"
+    mode: '0755'
+  tags: [backup, retention]
+
+- name: "[backup-retention] Setup daily backup cleanup cron job"
+  ansible.builtin.cron:
+    name: "Backup retention cleanup"
+    hour: "{{ (backup_schedule_hour + 6) % 24 }}"
+    minute: "{{ backup_schedule_minute }}"
+    job: "bash {{ backup_base_dir }}/retention-cleanup.sh >> {{ backup_base_dir }}/logs/cleanup.log 2>&1"
+    state: present
+    user: root
+  tags: [backup, retention, cron]
+
+- name: "[backup-retention] Create backup inventory script"
+  ansible.builtin.template:
+    src: backup-inventory.sh.j2
+    dest: "{{ backup_base_dir }}/inventory.sh"
+    mode: '0755'
+  tags: [backup, retention]

@@ -1,0 +1,26 @@
+#!/bin/bash
+# Backup Retention and Cleanup Script
+# Enforces backup retention policy
+
+BACKUP_DIR="{{ backup_base_dir }}"
+RETENTION_DAYS="{{ backup_retention_days }}"
+
+echo "[$(date)] Running backup retention cleanup (retention: $RETENTION_DAYS days)"
+
+# Cleanup PostgreSQL backups
+find "$BACKUP_DIR/postgresql" -type f -name "*.sql.*" -mtime +"$RETENTION_DAYS" -delete
+
+# Cleanup Vmstorage snapshots
+find "$BACKUP_DIR/vmstorage" -type f -name "*.tar.gz" -mtime +"$RETENTION_DAYS" -delete
+
+# Cleanup Loki configs
+find "$BACKUP_DIR/loki" -type f -name "*.tar.gz" -mtime +"$RETENTION_DAYS" -delete
+
+# Cleanup old logs
+find "$BACKUP_DIR/logs" -type f -name "*.log" -mtime +90 -delete
+
+echo "[$(date)] Retention cleanup completed"
+
+# Show current backup sizes
+echo "[$(date)] Current backup storage usage:"
+du -sh "$BACKUP_DIR"/*/ 2>/dev/null | sort -h

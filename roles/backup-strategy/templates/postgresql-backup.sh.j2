@@ -1,0 +1,67 @@
+#!/bin/bash
+# PostgreSQL Backup Script
+# Daily backup with retention policy
+
+set -e
+
+BACKUP_DIR="{{ backup_base_dir }}/postgresql"
+DB_HOST="{{ grafana_db_host }}"
+DB_PORT="{{ grafana_db_port }}"
+DB_USER="{{ grafana_db_user }}"
+DB_NAME="{{ grafana_db_name }}"
+RETENTION_DAYS="{{ backup_retention_days }}"
+COMPRESSION="{{ backup_compression }}"
+
+mkdir -p "$BACKUP_DIR"
+
+# Generate backup filename
+BACKUP_FILE="$BACKUP_DIR/postgresql-$(date +%Y%m%d-%H%M%S).sql"
+BACKUP_COMPRESSED="$BACKUP_FILE.$COMPRESSION"
+
+echo "[$(date)] Starting PostgreSQL backup..."
+
+# Backup PostgreSQL database
+docker exec postgresql pg_dump \
+    -h "$DB_HOST" \
+    -p "$DB_PORT" \
+    -U "$DB_USER" \
+    -d "$DB_NAME" \
+    --format=plain \
+    --verbose > "$BACKUP_FILE" 2>&1
+
+if [ -f "$BACKUP_FILE" ]; then
+    # Compress backup
+    case "$COMPRESSION" in
+        gzip)
+            gzip -{{ backup_compression_level }} "$BACKUP_FILE"
+            ;;
+        bzip2)
+            bzip2 -{{ backup_compression_level }} "$BACKUP_FILE"
+            ;;
+        *)
+            gzip -{{ backup_compression_level }} "$BACKUP_FILE"
+            ;;
+    esac
+    
+    # Verify backup
+    if [ -f "$BACKUP_COMPRESSED" ]; then
+        SIZE=$(du -h "$BACKUP_COMPRESSED" | cut -f1)
+        echo "[$(date)] Backup completed successfully: $BACKUP_COMPRESSED (Size: $SIZE)"
+        
+        # Optional: Upload to S3
+        {% if backup_to_s3 %}
+        aws s3 cp "$BACKUP_COMPRESSED" "s3://{{ backup_s3_bucket }}/{{ backup_s3_prefix }}/postgresql/"
+        {% endif %}
+    else
+        echo "[$(date)] ERROR: Compression failed"
+        exit 1
+    fi
+else
+    echo "[$(date)] ERROR: Backup file not created"
+    exit 1
+fi
+
+# Cleanup old backups
+find "$BACKUP_DIR" -name "*.sql.{{ backup_compression }}" -mtime +"$RETENTION_DAYS" -delete
+
+echo "[$(date)] PostgreSQL backup completed"

@@ -1,0 +1,48 @@
+---
+# roles/backup-strategy/tasks/main.yml
+# Setup backup infrastructure
+
+- name: "[backup] Create backup directories"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0700'
+  loop:
+    - "{{ backup_base_dir }}"
+    - "{{ backup_base_dir }}/postgresql"
+    - "{{ backup_base_dir }}/vmstorage"
+    - "{{ backup_base_dir }}/loki"
+    - "{{ backup_base_dir }}/logs"
+  tags: [backup, setup]
+
+- name: "[backup] Setup PostgreSQL backup"
+  ansible.builtin.include_tasks: postgresql.yml
+  when: backup_postgresql | default(true)
+  tags: [backup, postgresql]
+
+- name: "[backup] Setup Vmstorage backup"
+  ansible.builtin.include_tasks: vmstorage.yml
+  when: backup_vmstorage | default(true)
+  tags: [backup, vmstorage]
+
+- name: "[backup] Setup Loki backup"
+  ansible.builtin.include_tasks: loki.yml
+  when: backup_loki | default(true)
+  tags: [backup, loki]
+
+- name: "[backup] Setup backup retention policy"
+  ansible.builtin.include_tasks: retention.yml
+  tags: [backup, retention]
+
+- name: "[backup] Display backup configuration summary"
+  ansible.builtin.debug:
+    msg:
+      - "✓ Backup Strategy Configured"
+      - "  PostgreSQL: {{ backup_postgresql }}"
+      - "  Vmstorage: {{ backup_vmstorage }}"
+      - "  Loki: {{ backup_loki }}"
+      - "  S3 backup: {{ backup_to_s3 }}"
+      - "  Retention: {{ backup_retention_days }} days"
+      - "  Backup dir: {{ backup_base_dir }}"
+      - "  Scheduled: Daily at {{ backup_schedule_hour }}:{{ backup_schedule_minute }}"
+  tags: [backup, summary]

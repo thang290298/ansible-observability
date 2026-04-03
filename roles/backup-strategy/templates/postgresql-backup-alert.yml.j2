@@ -1,0 +1,22 @@
+groups:
+  - name: postgresql.backup
+    rules:
+      - alert: PostgreSQLBackupFailed
+        expr: |
+          (time() - max(timestamp(postgresql_backup_last_completed_time{})) by (instance)) / 86400 > 1.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PostgreSQL backup failed on {{ $labels.instance }}"
+          description: "No successful PostgreSQL backup in last 36 hours"
+          
+      - alert: PostgreSQLBackupStale
+        expr: |
+          (time() - max(timestamp(postgresql_backup_last_completed_time{})) by (instance)) / 86400 > 7
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL backup stale on {{ $labels.instance }}"
+          description: "No PostgreSQL backup in last 7 days - data recovery risk"

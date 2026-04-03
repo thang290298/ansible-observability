@@ -1,0 +1,29 @@
+#!/bin/bash
+# Loki S3 Data Backup Script
+# Sync Loki data to S3 for additional durability
+
+set -e
+
+LOKI_S3_BUCKET="{{ backup_s3_bucket }}"
+LOKI_S3_PREFIX="{{ backup_s3_prefix }}/loki-data"
+BACKUP_LOG="{{ backup_base_dir }}/logs/loki-s3-sync.log"
+
+mkdir -p "$(dirname "$BACKUP_LOG")"
+
+echo "[$(date)] Starting Loki S3 data sync..." | tee -a "$BACKUP_LOG"
+
+# Sync Loki chunks to S3
+if command -v aws &> /dev/null; then
+    aws s3 sync \
+        "/data/loki/chunks" \
+        "s3://$LOKI_S3_BUCKET/$LOKI_S3_PREFIX/chunks" \
+        --region {{ s3_region | default('us-east-1') }} \
+        --delete \
+        --exclude "*.tmp" \
+        2>&1 | tee -a "$BACKUP_LOG"
+    
+    echo "[$(date)] S3 sync completed" | tee -a "$BACKUP_LOG"
+else
+    echo "[$(date)] ERROR: AWS CLI not found" | tee -a "$BACKUP_LOG"
+    exit 1
+fi

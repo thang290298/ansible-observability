@@ -1,0 +1,33 @@
+#!/bin/bash
+# Vmstorage Snapshot Verification Script
+# Verify backup integrity
+
+BACKUP_DIR="{{ backup_base_dir }}/vmstorage"
+
+echo "=== Vmstorage Backup Verification ==="
+echo "Backup dir: $BACKUP_DIR"
+echo
+
+# List recent snapshots
+echo "Recent snapshots:"
+ls -lh "$BACKUP_DIR"/vmstorage-snapshot-*.tar.gz 2>/dev/null | tail -5
+
+# Check snapshot integrity
+echo
+echo "Verifying snapshot integrity..."
+for snapshot in "$BACKUP_DIR"/vmstorage-snapshot-*.tar.gz; do
+    if [ -f "$snapshot" ]; then
+        if tar -tzf "$snapshot" > /dev/null 2>&1; then
+            echo "✓ $snapshot: OK"
+        else
+            echo "✗ $snapshot: CORRUPTED"
+        fi
+    fi
+done
+
+# Show disk usage
+echo
+echo "Backup storage usage:"
+du -sh "$BACKUP_DIR"
+
+echo "=== Verification complete ==="

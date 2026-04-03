@@ -1,0 +1,31 @@
+---
+# roles/backup-strategy/defaults/main.yml
+# Backup strategy configuration
+
+backup_enabled: true
+backup_base_dir: "{{ monitoring_base_dir }}/backups"
+backup_retention_days: 30
+backup_schedule_hour: 2
+backup_schedule_minute: 0
+
+# Backup components
+backup_postgresql: true
+backup_vmstorage: true
+backup_loki: true
+backup_grafana_db: true
+
+# S3 backup (optional)
+backup_to_s3: "{{ s3_enabled | default(false) }}"
+backup_s3_bucket: "{{ s3_bucket_name | default('monitoring-backups') }}"
+backup_s3_prefix: "{{ environment_name | default('monitoring') }}/backups"
+
+# Backup compression
+backup_compression: "gzip"  # gzip, zstd, bzip2
+backup_compression_level: 6  # 1-9
+
+# Encryption (optional)
+backup_encryption_enabled: false
+backup_encryption_algorithm: "AES-256"
+
+# Notification
+backup_notify_on_failure: true
