@@ -1,0 +1,41 @@
+---
+# roles/audit-logging/tasks/loki-audit.yml
+# Setup Loki ingestion for centralized audit logs
+
+- name: "[audit-loki] Verify Loki is running"
+  ansible.builtin.uri:
+    url: "http://{{ loki_host | default('localhost') }}:{{ loki_port | default(3100) }}/ready"
+    method: GET
+    status_code: 200
+  register: loki_status
+  ignore_errors: true
+  tags: [audit-logging, loki]
+
+- name: "[audit-loki] Create Promtail config for audit logs"
+  block:
+    - name: "[audit-loki] Create audit log Promtail config"
+      ansible.builtin.template:
+        src: promtail-audit.yml.j2
+        dest: "{{ monitoring_base_dir }}/promtail/config-audit.yml"
+        mode: '0644'
+      notify: Restart promtail
+      tags: [audit-logging, loki, promtail]
+
+  when: loki_status.status is defined and loki_status.status == 200
+  tags: [audit-logging, loki]
+
+- name: "[audit-loki] Create audit log ingestion script"
+  ansible.builtin.template:
+    src: audit-logs-to-loki.sh.j2
+    dest: "{{ audit_logging_dir }}/ingest-to-loki.sh"
+    mode: '0755'
+  tags: [audit-logging, loki]
+
+- name: "[audit-loki] Setup cron job for log ingestion"
+  ansible.builtin.cron:
+    name: "Ingest audit logs to Loki"
+    minute: "*/10"
+    job: "bash {{ audit_logging_dir }}/ingest-to-loki.sh"
+    state: present
+    user: root
+  tags: [audit-logging, loki, cron]

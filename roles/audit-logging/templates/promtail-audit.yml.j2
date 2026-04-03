@@ -1,0 +1,42 @@
+# Promtail configuration for audit log ingestion
+scrape_configs:
+  - job_name: audit-postgresql
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: audit-postgresql
+          environment: {{ loki_audit_label_environment }}
+          service: {{ loki_audit_label_service }}
+          component: postgresql
+    file_sd_configs:
+      - files:
+          - {{ audit_logging_dir }}/postgresql/*.log
+          - {{ audit_logging_dir }}/postgresql/*.log.gz
+
+  - job_name: audit-haproxy
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: audit-haproxy
+          environment: {{ loki_audit_label_environment }}
+          service: {{ loki_audit_label_service }}
+          component: haproxy
+    file_sd_configs:
+      - files:
+          - {{ audit_logging_dir }}/haproxy/*.log
+          - {{ audit_logging_dir }}/haproxy/*.log.gz
+
+  - job_name: audit-deployments
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: audit-deployments
+          environment: {{ loki_audit_label_environment }}
+          service: {{ loki_audit_label_service }}
+          component: deployments
+    file_sd_configs:
+      - files:
+          - {{ audit_logging_dir }}/deployments/*.log

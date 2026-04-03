@@ -1,0 +1,36 @@
+# HAProxy Audit Logging Configuration
+# Captures admin operations and stats access
+
+global
+    # Audit log for admin operations
+    log stdout local0 info
+    log stdout local1 warning
+    
+    # Traffic logging
+    option httplog
+    option tcplog
+
+defaults
+    # Capture audit events
+    log global
+    mode http
+    
+    # Log connections
+    option httpchk
+    option dontlognull
+
+# Audit stats access
+frontend audit-stats
+    bind *:{{ haproxy_stats_port | default(8404) }}
+    mode http
+    
+    # Log all stat access requests
+    log global
+    
+    stats enable
+    stats uri /stats
+    stats auth {{ haproxy_stats_user }}:{{ haproxy_stats_password }}
+    stats admin if TRUE
+
+    # Custom log format for audit
+    log-format "[%pid] %{+Q}o %{-Q}c %Ci:%Cp [%t] \"%r\" %ST %B \"%{i}n\" \"%A\" \"%b\""

@@ -1,0 +1,33 @@
+---
+# roles/audit-logging/tasks/logrotate.yml
+# Setup log rotation for audit logs
+
+- name: "[audit-logrotate] Install logrotate"
+  ansible.builtin.package:
+    name: logrotate
+    state: present
+  become: true
+  tags: [audit-logging, logrotate]
+
+- name: "[audit-logrotate] Create logrotate config for audit logs"
+  ansible.builtin.copy:
+    content: |
+      {{ audit_logging_dir }}/*/*.log {
+        daily
+        missingok
+        rotate {{ audit_log_retention_days }}
+        compress
+        delaycompress
+        notifempty
+        create 0600 root root
+        sharedscripts
+      }
+    dest: "/etc/logrotate.d/monitoring-audit"
+    mode: '0644'
+  tags: [audit-logging, logrotate]
+
+- name: "[audit-logrotate] Test logrotate configuration"
+  ansible.builtin.command:
+    cmd: "logrotate -d /etc/logrotate.d/monitoring-audit"
+  changed_when: false
+  tags: [audit-logging, logrotate, test]

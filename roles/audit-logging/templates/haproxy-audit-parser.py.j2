@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+# HAProxy Audit Log Parser
+# Parses HAProxy logs to identify admin operations
+
+import json
+import re
+import sys
+from datetime import datetime
+from pathlib import Path
+
+LOG_FILE = "{{ audit_logging_dir }}/haproxy/access.log"
+PARSED_OUTPUT = "{{ audit_logging_dir }}/haproxy/audit-parsed.jsonl"
+
+def parse_haproxy_log(log_line):
+    """Parse HAProxy log line into structured audit event"""
+    # HAProxy standard log format: [date] client_ip client_port [request_info] status_code bytes_sent
+    pattern = r'\[(?P<timestamp>[^\]]+)\] (?P<client_ip>\S+):(?P<client_port>\d+) \[.*\] "(?P<method>\w+) (?P<path>\S+)" (?P<status>\d+) (?P<bytes>\d+)'
+    
+    match = re.search(pattern, log_line)
+    if not match:
+        return None
+    
+    data = match.groupdict()
+    
+    # Identify audit events
+    if '/stats' in data['path'] or 'admin' in data['path'].lower():
+        return {
+            'timestamp': data['timestamp'],
+            'type': 'admin_operation',
+            'client_ip': data['client_ip'],
+            'method': data['method'],
+            'path': data['path'],
+            'status': int(data['status']),
+            'severity': 'WARNING' if data['status'] in ['401', '403'] else 'INFO'
+        }
+    
+    return None
+
+def main():
+    try:
+        with open(LOG_FILE, 'r') as f:
+            with open(PARSED_OUTPUT, 'a') as out:
+                for line in f:
+                    event = parse_haproxy_log(line)
+                    if event:
+                        out.write(json.dumps(event) + '\n')
+        
+        print(f"Parsed HAProxy logs from {LOG_FILE} → {PARSED_OUTPUT}")
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()

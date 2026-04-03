@@ -1,0 +1,51 @@
+---
+# roles/audit-logging/tasks/postgresql-audit.yml
+# PostgreSQL audit logging via pgAudit extension
+
+- name: "[audit-postgresql] Verify PostgreSQL is running"
+  community.docker.docker_container_info:
+    name: postgresql
+  register: postgresql_status
+  ignore_errors: true
+  tags: [audit-logging, postgresql]
+
+- name: "[audit-postgresql] Check if pgaudit extension available"
+  block:
+    - name: "[audit-postgresql] List PostgreSQL extensions"
+      community.postgresql.postgresql_ext:
+        name: pgaudit
+        state: present
+        database: grafana
+        host: "{{ grafana_db_host }}"
+        port: "{{ grafana_db_port }}"
+        username: "{{ grafana_db_user }}"
+        password: "{{ grafana_db_password }}"
+      register: pgaudit_result
+      ignore_errors: true
+      tags: [audit-logging, postgresql]
+
+    - name: "[audit-postgresql] Configure PostgreSQL audit logging"
+      ansible.builtin.template:
+        src: postgresql-audit.sql.j2
+        dest: "{{ audit_logging_dir }}/postgresql/setup-audit.sql"
+        mode: '0600'
+      tags: [audit-logging, postgresql]
+
+  when: postgresql_status.exists | default(false)
+  tags: [audit-logging, postgresql]
+
+- name: "[audit-postgresql] Create PostgreSQL audit log capture script"
+  ansible.builtin.template:
+    src: postgresql-audit-capture.sh.j2
+    dest: "{{ audit_logging_dir }}/postgresql/capture-audit.sh"
+    mode: '0755'
+  tags: [audit-logging, postgresql]
+
+- name: "[audit-postgresql] Setup cron job for audit log collection"
+  ansible.builtin.cron:
+    name: "Collect PostgreSQL audit logs"
+    minute: "*/5"
+    job: "bash {{ audit_logging_dir }}/postgresql/capture-audit.sh"
+    state: present
+    user: root
+  tags: [audit-logging, postgresql, cron]

@@ -1,0 +1,50 @@
+#!/bin/bash
+# Audit Logs to Loki Ingestion Script
+# Sends audit logs to Loki for centralized storage and analysis
+
+LOKI_URL="{{ loki_endpoint | default('http://localhost:3100') }}"
+AUDIT_LOG_DIR="{{ audit_logging_dir }}"
+
+# Function to send logs to Loki
+send_to_loki() {
+    local log_file="$1"
+    local job_name="$2"
+    local component="$3"
+    
+    if [ ! -f "$log_file" ]; then
+        return
+    fi
+    
+    # Convert logs to Loki format
+    while IFS= read -r line; do
+        timestamp=$(date -d "$(echo "$line" | cut -d' ' -f1-2)" +%s%3N)000000 2>/dev/null || echo "$(date +%s)000000000")
+        
+        # Send to Loki
+        curl -X POST "$LOKI_URL/loki/api/v1/push" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOF
+{
+  "streams": [
+    {
+      "stream": {
+        "job": "$job_name",
+        "component": "$component",
+        "environment": "{{ loki_audit_label_environment }}"
+      },
+      "values": [
+        ["$timestamp", "$line"]
+      ]
+    }
+  ]
+}
+EOF
+    done < "$log_file"
+}
+
+# Ingest PostgreSQL audit logs
+send_to_loki "$AUDIT_LOG_DIR/postgresql/access.log" "audit-postgresql" "postgresql"
+
+# Ingest HAProxy audit logs
+send_to_loki "$AUDIT_LOG_DIR/haproxy/access.log" "audit-haproxy" "haproxy"
+
+echo "$(date): Audit logs ingested to Loki" >> "$AUDIT_LOG_DIR/ingest.log"

@@ -1,0 +1,21 @@
+#!/bin/bash
+# PostgreSQL Audit Log Capture Script
+# Collects PostgreSQL logs from container and archives to audit-logging directory
+
+AUDIT_DIR="{{ audit_logging_dir }}/postgresql"
+CONTAINER_NAME="postgresql"
+RETENTION_DAYS="{{ audit_log_retention_days }}"
+
+# Create audit directory if not exists
+mkdir -p "$AUDIT_DIR"
+
+# Export PostgreSQL logs from container
+docker logs "$CONTAINER_NAME" 2>/dev/null | grep -E "(AUDIT|ERROR|WARNING)" >> "$AUDIT_DIR/access.log"
+
+# Compress old logs (older than 7 days)
+find "$AUDIT_DIR" -name "*.log" -mtime +7 -exec gzip {} \;
+
+# Clean up logs older than retention period
+find "$AUDIT_DIR" -name "*.log.gz" -mtime +"$RETENTION_DAYS" -delete
+
+echo "$(date): PostgreSQL audit logs captured" >> "$AUDIT_DIR/capture.log"

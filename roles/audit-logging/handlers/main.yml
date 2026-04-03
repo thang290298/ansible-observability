@@ -1,0 +1,10 @@
+---
+# roles/audit-logging/handlers/main.yml
+# Handlers for audit logging changes
+
+- name: Restart promtail
+  community.docker.docker_container:
+    name: promtail
+    state: restarted
+  ignore_errors: true
+  listen: "Restart promtail"

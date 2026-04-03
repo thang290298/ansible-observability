@@ -1,0 +1,45 @@
+---
+# roles/audit-logging/tasks/main.yml
+# Setup centralized audit logging
+
+- name: "[audit-logging] Create audit log directory"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0700'
+  loop:
+    - "{{ audit_logging_dir }}"
+    - "{{ audit_logging_dir }}/postgresql"
+    - "{{ audit_logging_dir }}/haproxy"
+    - "{{ audit_logging_dir }}/deployments"
+  tags: [audit-logging, setup]
+
+- name: "[audit-logging] Setup PostgreSQL audit logging"
+  ansible.builtin.include_tasks: postgresql-audit.yml
+  when: audit_postgresql | default(true)
+  tags: [audit-logging, postgresql]
+
+- name: "[audit-logging] Setup HAProxy audit logging"
+  ansible.builtin.include_tasks: haproxy-audit.yml
+  when: audit_haproxy | default(true)
+  tags: [audit-logging, haproxy]
+
+- name: "[audit-logging] Setup Loki ingestion for audit logs"
+  ansible.builtin.include_tasks: loki-audit.yml
+  when: audit_logs_to_loki | default(true)
+  tags: [audit-logging, loki]
+
+- name: "[audit-logging] Setup log rotation"
+  ansible.builtin.include_tasks: logrotate.yml
+  tags: [audit-logging, rotation]
+
+- name: "[audit-logging] Display audit logging summary"
+  ansible.builtin.debug:
+    msg:
+      - "✓ Audit Logging Configuration Complete"
+      - "  Log directory: {{ audit_logging_dir }}"
+      - "  PostgreSQL audit: {{ audit_postgresql }}"
+      - "  HAProxy audit: {{ audit_haproxy }}"
+      - "  Loki ingestion: {{ audit_logs_to_loki }}"
+      - "  Log retention: {{ audit_log_retention_days }} days"
+  tags: [audit-logging, summary]

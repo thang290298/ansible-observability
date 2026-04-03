@@ -1,0 +1,56 @@
+---
+# roles/audit-logging/tasks/haproxy-audit.yml
+# HAProxy audit logging - track all admin operations
+
+- name: "[audit-haproxy] Verify HAProxy is running"
+  community.docker.docker_container_info:
+    name: haproxy
+  register: haproxy_status
+  ignore_errors: true
+  tags: [audit-logging, haproxy]
+
+- name: "[audit-haproxy] Create HAProxy audit logging configuration"
+  block:
+    - name: "[audit-haproxy] Create HAProxy audit log directory"
+      ansible.builtin.file:
+        path: "{{ audit_logging_dir }}/haproxy"
+        state: directory
+        mode: '0700'
+      tags: [audit-logging, haproxy]
+
+    - name: "[audit-haproxy] Generate HAProxy audit logging template"
+      ansible.builtin.template:
+        src: haproxy-audit-logging.cfg.j2
+        dest: "{{ audit_logging_dir }}/haproxy/audit-logging.cfg"
+        mode: '0644'
+      tags: [audit-logging, haproxy]
+
+    - name: "[audit-haproxy] Create HAProxy audit log parser script"
+      ansible.builtin.template:
+        src: haproxy-audit-parser.py.j2
+        dest: "{{ audit_logging_dir }}/haproxy/parse-logs.py"
+        mode: '0755'
+      tags: [audit-logging, haproxy]
+
+  when: haproxy_status.exists | default(false)
+  tags: [audit-logging, haproxy]
+
+- name: "[audit-haproxy] Setup HAProxy access log rotation"
+  ansible.builtin.copy:
+    content: |
+      {{ audit_logging_dir }}/haproxy/access.log {
+        daily
+        missingok
+        rotate {{ audit_log_retention_days }}
+        compress
+        delaycompress
+        notifempty
+        create 0640 root root
+        sharedscripts
+        postrotate
+          docker exec haproxy kill -USR1 1
+        endscript
+      }
+    dest: "/etc/logrotate.d/haproxy-audit"
+    mode: '0644'
+  tags: [audit-logging, haproxy, logrotate]

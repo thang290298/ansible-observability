@@ -1,0 +1,23 @@
+---
+# roles/audit-logging/defaults/main.yml
+# Audit logging for critical operations
+
+audit_logging_enabled: true
+audit_logging_dir: "{{ monitoring_base_dir }}/audit-logs"
+
+# Audit log retention
+audit_log_retention_days: 90
+
+# Components to audit
+audit_postgresql: true
+audit_haproxy: true
+audit_deployments: true
+audit_config_changes: true
+
+# Centralized log ingestion (Loki)
+audit_logs_to_loki: true
+loki_audit_label_environment: "{{ environment_name | default('monitoring') }}"
+loki_audit_label_service: "audit"
+
+# Log levels
+audit_log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR

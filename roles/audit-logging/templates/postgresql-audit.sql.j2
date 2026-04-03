@@ -1,0 +1,28 @@
+-- PostgreSQL Audit Logging Setup
+-- Run as superuser to enable pgaudit extension and configure logging
+
+-- Enable pgAudit extension
+CREATE EXTENSION IF NOT EXISTS pgaudit;
+
+-- Configure pgaudit settings
+ALTER SYSTEM SET pgaudit.log = 'ALL';
+ALTER SYSTEM SET pgaudit.log_catalog = off;
+ALTER SYSTEM SET pgaudit.log_relation = on;
+ALTER SYSTEM SET pgaudit.log_statement = on;
+ALTER SYSTEM SET pgaudit.log_parameter = on;
+
+-- Configure standard PostgreSQL logging
+ALTER SYSTEM SET log_statement = 'all';
+ALTER SYSTEM SET log_duration = on;
+ALTER SYSTEM SET log_lock_waits = on;
+ALTER SYSTEM SET log_connections = on;
+ALTER SYSTEM SET log_disconnections = on;
+
+-- Log configuration changes
+ALTER SYSTEM SET log_statement_sample_rate = 0.1;
+
+-- Reload PostgreSQL configuration
+SELECT pg_reload_conf();
+
+-- Verify pgaudit is active
+SELECT extname FROM pg_extension WHERE extname = 'pgaudit';
