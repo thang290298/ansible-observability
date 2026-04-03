@@ -1,0 +1,64 @@
+---
+# roles/self-monitoring/defaults/main.yml
+# Self-monitoring configuration for the monitoring stack
+
+self_monitoring_enabled: true
+
+# Prometheus self-scrape
+prometheus_self_scrape:
+  enabled: true
+  interval: "30s"
+  timeout: "10s"
+
+# Component health checks
+health_check_interval: 30  # seconds
+
+# Self-monitoring targets
+monitoring_targets:
+  prometheus:
+    name: "Prometheus"
+    port: 9090
+    metrics_path: "/metrics"
+    
+  grafana:
+    name: "Grafana"
+    port: 3000
+    metrics_path: "/metrics"
+    
+  loki:
+    name: "Loki"
+    port: 3100
+    metrics_path: "/metrics"
+    
+  vmstorage:
+    name: "Vmstorage"
+    port: 8482
+    metrics_path: "/metrics"
+    
+  vminsert:
+    name: "Vminsert"
+    port: 8480
+    metrics_path: "/metrics"
+    
+  vmselect:
+    name: "Vmselect"
+    port: 8481
+    metrics_path: "/metrics"
+    
+  vmagent:
+    name: "Vmagent"
+    port: 8429
+    metrics_path: "/metrics"
+    
+  alertmanager:
+    name: "AlertManager"
+    port: 9093
+    metrics_path: "/metrics"
+    
+  haproxy:
+    name: "HAProxy"
+    port: 8404
+    metrics_path: "/metrics"
+
+# Self-monitoring alerts
+self_monitoring_alerts_enabled: true

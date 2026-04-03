@@ -1,0 +1,29 @@
+groups:
+  - name: resource_limits.rules
+    rules:
+      - alert: ContainerHighMemoryUsage
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage in {{ $labels.container_name }}"
+          description: "Container {{ $labels.container_name }} memory usage is {{ $value }}%"
+
+      - alert: ContainerOOMKillWarning
+        expr: rate(container_last_seen{reason="oom_kill"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container OOM kill detected"
+          description: "Container {{ $labels.container_name }} was killed due to OOM"
+
+      - alert: ContainerHighCPUUsage
+        expr: (rate(container_cpu_usage_seconds_total[5m]) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage in {{ $labels.container_name }}"
+          description: "Container {{ $labels.container_name }} CPU usage is {{ $value }}%"

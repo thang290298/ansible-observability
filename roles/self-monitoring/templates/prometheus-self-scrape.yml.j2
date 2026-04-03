@@ -1,0 +1,27 @@
+# Prometheus Self-Scrape Configuration
+# Monitor Prometheus itself and all stack components
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Component monitoring
+  - job_name: 'monitoring-components'
+    static_configs:
+{% for component, config in monitoring_targets.items() %}
+      - targets:
+          - 'localhost:{{ config.port }}'
+        labels:
+          component: '{{ component }}'
+          service: 'monitoring-stack'
+{% endfor %}
+    metrics_path: '/metrics'
+    scrape_interval: {{ prometheus_self_scrape.interval }}
+    scrape_timeout: {{ prometheus_self_scrape.timeout }}
+
+  # Docker container metrics (via cAdvisor)
+  - job_name: 'docker-containers'
+    static_configs:
+      - targets: ['localhost:8080']

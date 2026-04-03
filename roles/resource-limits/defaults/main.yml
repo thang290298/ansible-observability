@@ -1,0 +1,82 @@
+---
+# roles/resource-limits/defaults/main.yml
+# Resource limits for Docker containers
+
+resource_limits_enabled: true
+
+# Default resource limits (applied to all containers)
+default_limits:
+  cpu: "1"
+  memory: "512m"
+  memory_swap: "1g"
+  memory_swappiness: 0
+
+# Per-container resource limits
+container_limits:
+  prometheus:
+    cpu_limit: "2"
+    memory_limit: "2g"
+    memory_swap: "4g"
+    health_threshold: 80  # Alert if memory usage > 80%
+    
+  grafana:
+    cpu_limit: "1"
+    memory_limit: "1g"
+    memory_swap: "2g"
+    health_threshold: 70
+    
+  loki:
+    cpu_limit: "2"
+    memory_limit: "2g"
+    memory_swap: "4g"
+    health_threshold: 80
+    
+  vmstorage:
+    cpu_limit: "4"
+    memory_limit: "4g"
+    memory_swap: "8g"
+    health_threshold: 85
+    
+  vminsert:
+    cpu_limit: "2"
+    memory_limit: "1g"
+    memory_swap: "2g"
+    health_threshold: 75
+    
+  vmselect:
+    cpu_limit: "2"
+    memory_limit: "1g"
+    memory_swap: "2g"
+    health_threshold: 75
+    
+  vmagent:
+    cpu_limit: "1"
+    memory_limit: "512m"
+    memory_swap: "1g"
+    health_threshold: 70
+    
+  alertmanager:
+    cpu_limit: "0.5"
+    memory_limit: "256m"
+    memory_swap: "512m"
+    health_threshold: 60
+    
+  haproxy:
+    cpu_limit: "1"
+    memory_limit: "512m"
+    memory_swap: "1g"
+    health_threshold: 70
+    
+  postgresql:
+    cpu_limit: "2"
+    memory_limit: "1g"
+    memory_swap: "2g"
+    health_threshold: 75
+
+# CPU quota
+cpu_quota_enabled: true
+cpu_period: "100000"  # microseconds
+
+# Memory policies
+memory_oom_kill_disable: false
+memory_swappiness: 0

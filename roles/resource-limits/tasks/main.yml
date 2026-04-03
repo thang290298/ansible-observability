@@ -1,0 +1,40 @@
+---
+# roles/resource-limits/tasks/main.yml
+# Setup resource limits for all containers
+
+- name: "[resource-limits] Create docker-compose resource limits template"
+  ansible.builtin.template:
+    src: docker-compose-limits.yml.j2
+    dest: "{{ monitoring_base_dir }}/docker-compose-limits.yml"
+    mode: '0644'
+  tags: [resource-limits, compose]
+
+- name: "[resource-limits] Apply resource limits to docker-compose files"
+  ansible.builtin.include_tasks: apply-limits.yml
+  tags: [resource-limits, apply]
+
+- name: "[resource-limits] Create resource monitoring dashboard"
+  ansible.builtin.template:
+    src: resource-limits-dashboard.json.j2
+    dest: "{{ monitoring_base_dir }}/grafana/provisioning/dashboards-enabled/resource-limits.json"
+    mode: '0644'
+  tags: [resource-limits, dashboard]
+
+- name: "[resource-limits] Create resource limit alert rules"
+  ansible.builtin.template:
+    src: resource-limits-alerts.yml.j2
+    dest: "{{ alert_rules_dir }}/resource-limits.yml"
+    mode: '0644'
+  when: alert_rules_dir is defined
+  tags: [resource-limits, alerts]
+
+- name: "[resource-limits] Display resource limits summary"
+  ansible.builtin.debug:
+    msg:
+      - "✓ Resource Limits Configuration Complete"
+      - "  CPU limits enforced: {{ resource_limits_enabled }}"
+      - "  Memory swappiness: {{ memory_swappiness }}"
+      - "  Containers configured: {{ container_limits | length }}"
+      - "  Monitoring dashboard: resource-limits.json"
+      - "  Alert rules: resource-limits.yml"
+  tags: [resource-limits, summary]

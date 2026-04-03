@@ -1,0 +1,53 @@
+---
+# roles/self-monitoring/tasks/main.yml
+# Setup self-monitoring for the monitoring stack
+
+- name: "[self-monitoring] Generate Prometheus self-scrape config"
+  ansible.builtin.template:
+    src: prometheus-self-scrape.yml.j2
+    dest: "{{ monitoring_base_dir }}/prometheus/self-scrape-config.yml"
+    mode: '0644'
+  notify: Reload Prometheus config
+  tags: [self-monitoring, prometheus]
+
+- name: "[self-monitoring] Create self-monitoring alert rules"
+  ansible.builtin.template:
+    src: self-monitoring-alerts.yml.j2
+    dest: "{{ alert_rules_dir }}/self-monitoring.yml"
+    mode: '0644'
+  when: alert_rules_dir is defined
+  tags: [self-monitoring, alerts]
+
+- name: "[self-monitoring] Create infrastructure health dashboard"
+  ansible.builtin.template:
+    src: infrastructure-health-dashboard.json.j2
+    dest: "{{ monitoring_base_dir }}/grafana/provisioning/dashboards-enabled/infrastructure-health.json"
+    mode: '0644'
+  tags: [self-monitoring, dashboard]
+
+- name: "[self-monitoring] Setup component health check script"
+  ansible.builtin.template:
+    src: health-check.sh.j2
+    dest: "{{ monitoring_base_dir }}/health-check.sh"
+    mode: '0755'
+  tags: [self-monitoring, healthcheck]
+
+- name: "[self-monitoring] Setup health check cron job"
+  ansible.builtin.cron:
+    name: "Monitoring stack health check"
+    minute: "*"
+    job: "bash {{ monitoring_base_dir }}/health-check.sh >> {{ monitoring_base_dir }}/logs/health-check.log 2>&1"
+    state: present
+    user: root
+  tags: [self-monitoring, healthcheck, cron]
+
+- name: "[self-monitoring] Display self-monitoring summary"
+  ansible.builtin.debug:
+    msg:
+      - "✓ Self-Monitoring Configuration Complete"
+      - "  Prometheus self-scrape: {{ prometheus_self_scrape.enabled }}"
+      - "  Components monitored: {{ monitoring_targets | length }}"
+      - "  Health check interval: {{ health_check_interval }}s"
+      - "  Dashboard: infrastructure-health.json"
+      - "  Alert rules: self-monitoring.yml"
+  tags: [self-monitoring, summary]

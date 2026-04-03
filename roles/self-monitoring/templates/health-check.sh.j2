@@ -1,0 +1,51 @@
+#!/bin/bash
+# Monitoring Stack Health Check Script
+# Verifies all monitoring components are running and responsive
+
+set -e
+
+LOG_FILE="{{ monitoring_base_dir }}/logs/health-check.log"
+ALERT_FILE="{{ monitoring_base_dir }}/health-issues.log"
+
+# Create log directory
+mkdir -p "$(dirname "$LOG_FILE")"
+
+echo "[$(date)] Starting health check..." >> "$LOG_FILE"
+
+# Track failures
+FAILURES=0
+
+# Check each component
+check_component() {
+    local component=$1
+    local port=$2
+    local endpoint=$3
+    
+    if curl -s --connect-timeout 5 -f "http://localhost:$port$endpoint" > /dev/null 2>&1; then
+        echo "[$(date)] ✓ $component is healthy" >> "$LOG_FILE"
+        return 0
+    else
+        echo "[$(date)] ✗ $component is DOWN" | tee -a "$LOG_FILE" >> "$ALERT_FILE"
+        ((FAILURES++))
+        return 1
+    fi
+}
+
+# Check all components
+check_component "Prometheus" 9090 "/api/v1/query?query=up"
+check_component "Grafana" 3000 "/api/health"
+check_component "Loki" 3100 "/ready"
+check_component "Vmstorage" 8482 "/health"
+check_component "Vminsert" 8480 "/health"
+check_component "Vmselect" 8481 "/health"
+check_component "Vmagent" 8429 "/health"
+check_component "AlertManager" 9093 "/-/healthy"
+
+# Summary
+if [ $FAILURES -gt 0 ]; then
+    echo "[$(date)] Health check FAILED: $FAILURES components down" >> "$LOG_FILE"
+    exit 1
+else
+    echo "[$(date)] Health check PASSED: All components healthy" >> "$LOG_FILE"
+    exit 0
+fi

@@ -1,0 +1,28 @@
+---
+# roles/resource-limits/tasks/apply-limits.yml
+# Apply resource limits to running docker-compose services
+
+- name: "[resource-limits] Apply CPU/memory limits to containers"
+  community.docker.docker_container:
+    name: "{{ item.key }}"
+    cpu_quota: "{{ (item.value.cpu_limit | float * 100000) | int }}"
+    memory: "{{ item.value.memory_limit }}"
+    memory_swap: "{{ item.value.memory_swap }}"
+    memory_swappiness: "{{ memory_swappiness }}"
+    oom_kill_disable: "{{ memory_oom_kill_disable }}"
+  loop: "{{ container_limits | dict2items }}"
+  ignore_errors: true
+  tags: [resource-limits, apply, docker]
+
+- name: "[resource-limits] Verify resource limits applied"
+  ansible.builtin.shell:
+    cmd: "docker inspect {{ item.key }} | jq '.[] | {memory_limit: .HostConfig.Memory, cpu_quota: .HostConfig.CpuQuota}'"
+  register: limits_verification
+  loop: "{{ container_limits | dict2items }}"
+  changed_when: false
+  tags: [resource-limits, verify]
+
+- name: "[resource-limits] Display applied limits"
+  ansible.builtin.debug:
+    msg: "{{ limits_verification.results | map(attribute='stdout_lines') | list }}"
+  tags: [resource-limits, verify]

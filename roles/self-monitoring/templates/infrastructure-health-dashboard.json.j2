@@ -1,0 +1,59 @@
+{
+  "dashboard": {
+    "title": "Infrastructure Health - Monitoring Stack",
+    "uid": "infrastructure-health-monitoring",
+    "tags": ["monitoring", "infrastructure", "health"],
+    "refresh": "30s",
+    "panels": [
+      {
+        "title": "Monitoring Stack Status",
+        "description": "Real-time health status of all monitoring components",
+        "targets": [
+          {
+            "expr": "up{service=\"monitoring-stack\"}"
+          }
+        ]
+      },
+      {
+        "title": "Component Uptime (24h)",
+        "targets": [
+          {
+            "expr": "avg_over_time(up{service=\"monitoring-stack\"}[24h]) * 100"
+          }
+        ]
+      },
+      {
+        "title": "Prometheus Scrape Rate",
+        "targets": [
+          {
+            "expr": "rate(prometheus_tsdb_symbol_table_size_bytes[5m])"
+          }
+        ]
+      },
+      {
+        "title": "Active Alerts",
+        "targets": [
+          {
+            "expr": "ALERTS{severity!=\"none\"}"
+          }
+        ]
+      },
+      {
+        "title": "Disk Usage",
+        "targets": [
+          {
+            "expr": "node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100"
+          }
+        ]
+      },
+      {
+        "title": "Loki Ingestion Rate",
+        "targets": [
+          {
+            "expr": "rate(loki_distributor_incoming_requests_total[5m])"
+          }
+        ]
+      }
+    ]
+  }
+}
