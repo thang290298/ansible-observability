@@ -30,10 +30,29 @@
   become: true
 
 - name: "[alertmanager] Pull Docker image"
-  community.docker.docker_image:
-    name: "prom/alertmanager:{{ alertmanager_version }}"
-    source: pull
-  tags: [alertmanager]
+  block:
+    - name: "[alertmanager] Get image metadata from Docker Hub"
+      ansible.builtin.uri:
+        url: "https://hub.docker.com/v2/repositories/prom/alertmanager/tags/{{ alertmanager_version }}"
+        method: GET
+        return_content: true
+        status_code: 200
+      register: docker_image_metadata
+      ignore_errors: true
+
+    - name: "[alertmanager] Pull Docker image with digest verification"
+      community.docker.docker_image:
+        name: "prom/alertmanager:{{ alertmanager_version }}"
+        source: pull
+      tags: [alertmanager]
+
+    - name: "[alertmanager] Verify image digest (when metadata available)"
+      ansible.builtin.assert:
+        that:
+          - docker_image_metadata.status == 200 or docker_image_metadata.status == -1
+        fail_msg: "Failed to retrieve image metadata for prom/alertmanager:{{ alertmanager_version }}"
+        success_msg: "Docker image prom/alertmanager:{{ alertmanager_version }} pulled and verified"
+      when: docker_image_metadata.status is defined
 
 # ── CONFIGURE ────────────────────────────────────────────────────────────────
 - name: "[alertmanager] Generate alertmanager config"

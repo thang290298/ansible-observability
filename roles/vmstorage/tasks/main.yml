@@ -22,9 +22,18 @@
     state: present
 
 - name: "[vmstorage] Health check"
-  ansible.builtin.uri:
-    url: "http://localhost:{{ vmstorage_port }}/health"
-    status_code: 200
-  ignore_errors: true
-  retries: 10
-  delay: 5
+  block:
+    - name: "[vmstorage] Check if healthy"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ vmstorage_port }}/health"
+        status_code: 200
+      retries: 10
+      delay: 5
+      register: vmstorage_health_result
+
+    - name: "[vmstorage] Assert health check passed"
+      ansible.builtin.assert:
+        that:
+          - vmstorage_health_result.status == 200
+        fail_msg: "vmstorage health check failed after 10 retries. Status: {{ vmstorage_health_result.get('status', 'N/A') }}"
+        success_msg: "vmstorage is healthy and ready"

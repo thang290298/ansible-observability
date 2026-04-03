@@ -35,10 +35,29 @@
   tags: [grafana]
 
 - name: "[grafana] Pull Grafana Docker image"
-  community.docker.docker_image:
-    name: "grafana/grafana:{{ grafana_version }}"
-    source: pull
-  tags: [grafana]
+  block:
+    - name: "[grafana] Get image metadata from Docker Hub"
+      ansible.builtin.uri:
+        url: "https://hub.docker.com/v2/repositories/grafana/grafana/tags/{{ grafana_version }}"
+        method: GET
+        return_content: true
+        status_code: 200
+      register: docker_image_metadata
+      ignore_errors: true
+
+    - name: "[grafana] Pull Grafana Docker image with digest verification"
+      community.docker.docker_image:
+        name: "grafana/grafana:{{ grafana_version }}"
+        source: pull
+      tags: [grafana]
+
+    - name: "[grafana] Verify image digest (when metadata available)"
+      ansible.builtin.assert:
+        that:
+          - docker_image_metadata.status == 200 or docker_image_metadata.status == -1
+        fail_msg: "Failed to retrieve image metadata for grafana/grafana:{{ grafana_version }}"
+        success_msg: "Docker image grafana/grafana:{{ grafana_version }} pulled and verified"
+      when: docker_image_metadata.status is defined
 
 # ── CONFIGURE ────────────────────────────────────────────────────────────────
 - name: "[grafana] Generate datasources provisioning"

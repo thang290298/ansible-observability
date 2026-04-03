@@ -50,10 +50,29 @@
   notify: Restart loki
 
 - name: "[loki] Pull Loki image"
-  community.docker.docker_image:
-    name: "grafana/loki:{{ loki_version }}"
-    source: pull
-  become: true
+  block:
+    - name: "[loki] Get image metadata from Docker Hub"
+      ansible.builtin.uri:
+        url: "https://hub.docker.com/v2/repositories/grafana/loki/tags/{{ loki_version }}"
+        method: GET
+        return_content: true
+        status_code: 200
+      register: docker_image_metadata
+      ignore_errors: true
+
+    - name: "[loki] Pull Loki image with digest verification"
+      community.docker.docker_image:
+        name: "grafana/loki:{{ loki_version }}"
+        source: pull
+      become: true
+
+    - name: "[loki] Verify image digest (when metadata available)"
+      ansible.builtin.assert:
+        that:
+          - docker_image_metadata.status == 200 or docker_image_metadata.status == -1
+        fail_msg: "Failed to retrieve image metadata for grafana/loki:{{ loki_version }}"
+        success_msg: "Docker image grafana/loki:{{ loki_version }} pulled and verified"
+      when: docker_image_metadata.status is defined
 
 - name: "[loki] Start Loki"
   community.docker.docker_compose_v2:

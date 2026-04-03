@@ -17,6 +17,7 @@
     dest: /etc/vmagent/scrape.yml
     backup: true
   become: true
+  run_once: true
   notify: Reload vmagent
 
 - name: "[vmagent] Copy file-based targets"
@@ -41,9 +42,18 @@
     state: present
 
 - name: "[vmagent] Health check"
-  ansible.builtin.uri:
-    url: "http://localhost:{{ vmagent_port }}/health"
-    status_code: 200
-  ignore_errors: true
-  retries: 10
-  delay: 5
+  block:
+    - name: "[vmagent] Check if healthy"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ vmagent_port }}/health"
+        status_code: 200
+      retries: 10
+      delay: 5
+      register: vmagent_health_result
+
+    - name: "[vmagent] Assert health check passed"
+      ansible.builtin.assert:
+        that:
+          - vmagent_health_result.status == 200
+        fail_msg: "vmagent health check failed after 10 retries. Status: {{ vmagent_health_result.get('status', 'N/A') }}"
+        success_msg: "vmagent is healthy and ready"
