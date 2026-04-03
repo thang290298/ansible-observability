@@ -1,0 +1,149 @@
+---
+# roles/alert-rules/tasks/deploy.yml
+# Deploy alert rules to Prometheus, Vmalert, AlertManager
+
+# ── PREFLIGHT: VALIDATE RULES ────────────────────────────────────────────────
+- name: "[alert-rules] Validate alert rules with promtool"
+  block:
+    - name: "[alert-rules] Check alert-rules directory exists"
+      ansible.builtin.stat:
+        path: "{{ alert_rules_source_dir }}"
+      register: alert_rules_source_stat
+      delegate_to: localhost
+      run_once: true
+
+    - name: "[alert-rules] Validate rules syntax"
+      ansible.builtin.command:
+        cmd: |
+          docker run --rm \
+            -v {{ alert_rules_source_dir }}:/rules:ro \
+            prom/prometheus:latest \
+            promtool check rules /rules/*.yml
+      register: alert_rules_validation
+      changed_when: false
+      failed_when: alert_rules_validation.rc != 0
+      delegate_to: localhost
+      run_once: true
+      when: alert_rules_source_stat.stat.exists
+
+    - name: "[alert-rules] Display validation result"
+      ansible.builtin.debug:
+        msg: "{{ alert_rules_validation.stdout_lines | default(['No validation output']) }}"
+      run_once: true
+
+  when: alert_rules_validate_before_deploy | default(true)
+  tags: [alert-rules, validation]
+
+# ── PREPARE: CREATE DIRECTORIES ──────────────────────────────────────────────
+- name: "[alert-rules] Create alert rules directory"
+  ansible.builtin.file:
+    path: "{{ alert_rules_deploy_dir }}"
+    state: directory
+    mode: '0755'
+  tags: [alert-rules]
+
+# ── DEPLOY: COPY RULES TO PROMETHEUS ─────────────────────────────────────────
+- name: "[alert-rules] Deploy alert rules to Prometheus"
+  block:
+    - name: "[alert-rules] Create prometheus rules subdirectory"
+      ansible.builtin.file:
+        path: "{{ monitoring_base_dir }}/prometheus/alert-rules"
+        state: directory
+        mode: '0755'
+
+    - name: "[alert-rules] Copy alert rules to Prometheus"
+      ansible.builtin.copy:
+        src: "{{ alert_rules_source_dir }}/{{ item }}"
+        dest: "{{ monitoring_base_dir }}/prometheus/alert-rules/"
+        mode: '0644'
+        backup: true
+      loop: "{{ lookup('fileglob', alert_rules_source_dir + '/*.yml', wantlist=True) | map('basename') }}"
+      notify: Reload Prometheus rules
+
+  when: alert_rules_deploy_to_prometheus | default(true)
+  tags: [alert-rules, prometheus]
+
+# ── DEPLOY: COPY RULES TO VMALERT ────────────────────────────────────────────
+- name: "[alert-rules] Deploy alert rules to Vmalert"
+  block:
+    - name: "[alert-rules] Create vmalert rules subdirectory"
+      ansible.builtin.file:
+        path: "{{ monitoring_base_dir }}/vmalert/alert-rules"
+        state: directory
+        mode: '0755'
+
+    - name: "[alert-rules] Copy alert rules to Vmalert"
+      ansible.builtin.copy:
+        src: "{{ alert_rules_source_dir }}/{{ item }}"
+        dest: "{{ monitoring_base_dir }}/vmalert/alert-rules/"
+        mode: '0644'
+        backup: true
+      loop: "{{ lookup('fileglob', alert_rules_source_dir + '/*.yml', wantlist=True) | map('basename') }}"
+      notify: Restart vmalert
+
+  when: alert_rules_deploy_to_vmalert | default(true)
+  tags: [alert-rules, vmalert]
+
+# ── RELOAD: SIGNAL COMPONENTS ────────────────────────────────────────────────
+- name: "[alert-rules] Trigger handlers to reload components"
+  ansible.builtin.meta: flush_handlers
+  tags: [alert-rules]
+
+# ── VERIFICATION: CHECK DEPLOYMENT ──────────────────────────────────────────
+- name: "[alert-rules] Verify Prometheus loaded alert rules"
+  block:
+    - name: "[alert-rules] Query Prometheus rules API"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ prometheus_port }}/api/v1/rules"
+        method: GET
+        return_content: true
+        status_code: 200
+      register: prometheus_rules_response
+      retries: 5
+      delay: 3
+      until: prometheus_rules_response.status == 200
+
+    - name: "[alert-rules] Display Prometheus rule groups"
+      ansible.builtin.debug:
+        msg:
+          - "✓ Alert rules loaded in Prometheus"
+          - "Rule groups: {{ prometheus_rules_response.json.data.groups | length }}"
+          - "Rules details:"
+          - "  {{ prometheus_rules_response.json.data.groups | to_nice_yaml }}"
+      when: prometheus_rules_response.json.data.groups
+
+  ignore_errors: true
+  tags: [alert-rules, verification]
+
+# ── VERSION CONTROL: LOG DEPLOYMENT ──────────────────────────────────────────
+- name: "[alert-rules] Create deployment record"
+  ansible.builtin.copy:
+    content: |
+      # Alert Rules Deployment Record
+      Deployment Date: {{ ansible_date_time.iso8601 }}
+      Host: {{ inventory_hostname }}
+      Ansible User: {{ ansible_user_id }}
+      Rules Source: {{ alert_rules_source_dir }}
+      Rules Deployed To: {{ alert_rules_deploy_dir }}
+      
+      Deployed Rules:
+      {% for rule_file in lookup('fileglob', alert_rules_source_dir + '/*.yml', wantlist=True) | map('basename') | list %}
+      - {{ rule_file }}
+      {% endfor %}
+    dest: "{{ alert_rules_deploy_dir }}/DEPLOYMENT.txt"
+    mode: '0644'
+    backup: true
+  tags: [alert-rules, version-control]
+
+# ── SUMMARY ──────────────────────────────────────────────────────────────────
+- name: "[alert-rules] Display deployment summary"
+  ansible.builtin.debug:
+    msg:
+      - "✓ Alert Rules Deployment Complete"
+      - "  Source: {{ alert_rules_source_dir }}"
+      - "  Deployed to Prometheus: {{ alert_rules_deploy_to_prometheus }}"
+      - "  Deployed to Vmalert: {{ alert_rules_deploy_to_vmalert }}"
+      - "  Version control: {{ alert_rules_version_control }}"
+      - "  Deployment log: {{ alert_rules_deploy_dir }}/DEPLOYMENT.txt"
+  run_once: true
+  tags: [alert-rules, summary]

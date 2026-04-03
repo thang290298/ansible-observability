@@ -1,0 +1,18 @@
+---
+# roles/alert-rules/handlers/main.yml
+# Alert rules deployment handlers
+
+- name: Reload Prometheus rules
+  ansible.builtin.uri:
+    url: "http://localhost:{{ prometheus_port | default(9090) }}/-/reload"
+    method: POST
+    status_code: [200, 204]
+  ignore_errors: true
+  listen: "Reload Prometheus rules"
+
+- name: Restart vmalert
+  community.docker.docker_container:
+    name: vmalert
+    state: restarted
+  ignore_errors: true
+  listen: "Restart vmalert"

@@ -1,0 +1,8 @@
+---
+# roles/alert-rules/tasks/main.yml
+# Deploy and manage alert rules across monitoring stack
+
+- name: "[alert-rules] Include alert rules deployment"
+  ansible.builtin.include_tasks: deploy.yml
+  when: alert_rules_enabled | default(true)
+  tags: [alert-rules]

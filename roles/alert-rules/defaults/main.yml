@@ -1,0 +1,20 @@
+---
+# roles/alert-rules/defaults/main.yml
+# Alert rules management defaults
+
+alert_rules_enabled: true
+alert_rules_source_dir: "{{ playbook_dir }}/../../alert-rules"
+alert_rules_deploy_dir: "{{ monitoring_base_dir }}/alert-rules"
+
+# Alert target components
+alert_rules_deploy_to_prometheus: true
+alert_rules_deploy_to_vmalert: true
+alert_rules_deploy_to_alertmanager: false
+
+# Version control
+alert_rules_version_control: true
+alert_rules_git_commit_message: "Auto-deploy: {{ ansible_date_time.iso8601 }}"
+
+# Validation
+alert_rules_validate_before_deploy: true
+alert_rules_validation_tool: "promtool"  # or custom script
