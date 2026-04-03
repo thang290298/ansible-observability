@@ -1,0 +1,118 @@
+---
+# roles/grafana/tasks/provisioning.yml
+# Grafana auto-provisioning: datasources + dashboards + folders
+# Auto-detect available backends (Prometheus/Loki/Thanos)
+
+# ── PREFLIGHT: DETECT AVAILABLE BACKENDS ──────────────────────────────────────
+- name: "[grafana-provisioning] Detect available datasources"
+  ansible.builtin.set_fact:
+    grafana_detected_datasources:
+      prometheus: "{{ 'monitoring_metrics' in groups and groups['monitoring_metrics'] | length > 0 }}"
+      loki: "{{ 'monitoring_logs' in groups and groups['monitoring_logs'] | length > 0 }}"
+      thanos: "{{ s3_enabled | default(false) }}"
+      alertmanager: "{{ 'monitoring_alerting' in groups and groups['monitoring_alerting'] | length > 0 }}"
+  tags: [grafana, provisioning]
+
+- name: "[grafana-provisioning] Display detected datasources"
+  ansible.builtin.debug:
+    msg: "{{ grafana_detected_datasources }}"
+  tags: [grafana, provisioning]
+
+# ── VERIFY DATASOURCE ENDPOINTS ───────────────────────────────────────────────
+- name: "[grafana-provisioning] Get VictoriaMetrics endpoints"
+  ansible.builtin.set_fact:
+    grafana_vmselect_endpoints: |
+      {%- set nodes = [] -%}
+      {%- for host in groups.get('monitoring_metrics', []) -%}
+        {%- set _ = nodes.append('http://' + hostvars[host].get('ansible_host', host) + ':' + (vmagent_port | string)) -%}
+      {%- endfor -%}
+      {{ nodes }}
+  tags: [grafana, provisioning]
+
+- name: "[grafana-provisioning] Get Loki endpoints"
+  ansible.builtin.set_fact:
+    grafana_loki_endpoints: |
+      {%- set nodes = [] -%}
+      {%- for host in groups.get('monitoring_logs', []) -%}
+        {%- set _ = nodes.append('http://' + hostvars[host].get('ansible_host', host) + ':' + (loki_port | string)) -%}
+      {%- endfor -%}
+      {{ nodes }}
+  tags: [grafana, provisioning]
+
+- name: "[grafana-provisioning] Get Thanos Query endpoints"
+  ansible.builtin.set_fact:
+    grafana_thanos_endpoints: |
+      {%- set nodes = [] -%}
+      {%- if s3_enabled | default(false) -%}
+        {%- for host in groups.get('monitoring_metrics', []) -%}
+          {%- set _ = nodes.append('http://' + hostvars[host].get('ansible_host', host) + ':' + (thanos_query_port | default(10902) | string)) -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {{ nodes }}
+  tags: [grafana, provisioning]
+
+# ── CREATE PROVISIONING DIRECTORIES ───────────────────────────────────────────
+- name: "[grafana-provisioning] Create provisioning directories"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ monitoring_base_dir }}/grafana/provisioning/dashboards"
+    - "{{ monitoring_base_dir }}/grafana/provisioning/dashboards-enabled"
+    - "{{ monitoring_base_dir }}/grafana/provisioning/folders"
+  become: true
+  tags: [grafana, provisioning]
+
+# ── GENERATE DATASOURCES CONFIG ───────────────────────────────────────────────
+- name: "[grafana-provisioning] Generate datasources.yml (auto-detect)"
+  ansible.builtin.template:
+    src: provisioning/datasources-auto.yml.j2
+    dest: "{{ monitoring_base_dir }}/grafana/provisioning/datasources/datasources.yml"
+    mode: '0644'
+    backup: true
+  notify: Restart grafana
+  tags: [grafana, provisioning]
+
+# ── GENERATE DASHBOARDS CONFIG ────────────────────────────────────────────────
+- name: "[grafana-provisioning] Generate dashboards provider config"
+  ansible.builtin.template:
+    src: provisioning/dashboards-provider.yml.j2
+    dest: "{{ monitoring_base_dir }}/grafana/provisioning/dashboards/dashboards.yml"
+    mode: '0644'
+    backup: true
+  notify: Restart grafana
+  tags: [grafana, provisioning]
+
+# ── GENERATE FOLDERS CONFIG ──────────────────────────────────────────────────
+- name: "[grafana-provisioning] Generate folders config"
+  ansible.builtin.template:
+    src: provisioning/folders.yml.j2
+    dest: "{{ monitoring_base_dir }}/grafana/provisioning/folders/folders.yml"
+    mode: '0644'
+    backup: true
+  notify: Restart grafana
+  tags: [grafana, provisioning]
+
+# ── COPY DASHBOARD TEMPLATES ─────────────────────────────────────────────────
+- name: "[grafana-provisioning] Copy bundled dashboard templates"
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ monitoring_base_dir }}/grafana/provisioning/dashboards-enabled/"
+    mode: '0644'
+  loop: "{{ lookup('fileglob', 'templates/dashboards/*.json', wantlist=True) | default([]) }}"
+  tags: [grafana, provisioning]
+
+# ── DISPLAY PROVISIONING INFO ────────────────────────────────────────────────
+- name: "[grafana-provisioning] Display auto-provisioning summary"
+  ansible.builtin.debug:
+    msg:
+      - "✓ Grafana Auto-Provisioning Summary:"
+      - "  • VictoriaMetrics: {{ 'detected' if grafana_detected_datasources.prometheus else 'NOT detected' }}"
+      - "  • Loki: {{ 'detected' if grafana_detected_datasources.loki else 'NOT detected' }}"
+      - "  • Thanos: {{ 'detected' if grafana_detected_datasources.thanos else 'NOT detected' }}"
+      - "  • AlertManager: {{ 'detected' if grafana_detected_datasources.alertmanager else 'NOT detected' }}"
+      - "  • Datasources Config: {{ monitoring_base_dir }}/grafana/provisioning/datasources/datasources.yml"
+      - "  • Dashboards Config: {{ monitoring_base_dir }}/grafana/provisioning/dashboards/dashboards.yml"
+      - "  • Folders Config: {{ monitoring_base_dir }}/grafana/provisioning/folders/folders.yml"
+  tags: [grafana, provisioning]

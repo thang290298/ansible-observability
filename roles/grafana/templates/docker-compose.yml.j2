@@ -28,7 +28,10 @@ services:
       GF_LOG_LEVEL: info
     volumes:
       - {{ grafana_data_path }}:/var/lib/grafana
-      - ./provisioning:/etc/grafana/provisioning:ro
+      - ./provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./provisioning/dashboards-enabled:/etc/grafana/provisioning/dashboards-enabled:ro
+      - ./provisioning/folders:/etc/grafana/provisioning/folders:ro
     ports:
       - "{{ grafana_port }}:3000"
     labels:

@@ -60,14 +60,9 @@
       when: docker_image_metadata.status is defined
 
 # ── CONFIGURE ────────────────────────────────────────────────────────────────
-- name: "[grafana] Generate datasources provisioning"
-  ansible.builtin.template:
-    src: provisioning/datasources.yml.j2
-    dest: "{{ monitoring_base_dir }}/grafana/provisioning/datasources/datasources.yml"
-    mode: '0644'
-    backup: true
-  notify: Restart grafana
-  tags: [grafana]
+- name: "[grafana] Run auto-provisioning (datasources, dashboards, folders)"
+  ansible.builtin.include_tasks: provisioning.yml
+  tags: [grafana, provisioning]
 
 - name: "[grafana] Generate docker-compose"
   ansible.builtin.template:
