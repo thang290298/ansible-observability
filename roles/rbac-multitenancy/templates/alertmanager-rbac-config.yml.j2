@@ -1,0 +1,41 @@
+# AlertManager RBAC Configuration
+# Role-based access control for alert management
+
+global:
+  resolve_timeout: 5m
+
+# Access control rules
+access_control:
+  enabled: true
+  
+  admin_group: "alertmanager-admins"
+  operator_group: "alertmanager-operators"
+  
+  # Admin: full access (create, edit, delete rules)
+  admin_permissions:
+    - "alerts:create"
+    - "alerts:write"
+    - "alerts:delete"
+    - "routes:create"
+    - "routes:write"
+    - "routes:delete"
+    - "silences:create"
+    - "silences:write"
+    - "silences:delete"
+  
+  # Operator: manage silences, view rules
+  operator_permissions:
+    - "alerts:read"
+    - "silences:create"
+    - "silences:write"
+    - "silences:delete"
+  
+  # Viewer: read-only access
+  viewer_permissions:
+    - "alerts:read"
+    - "silences:read"
+
+# Audit logging
+audit:
+  enabled: true
+  log_file: /var/log/alertmanager/audit.log

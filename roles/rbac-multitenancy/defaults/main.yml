@@ -1,0 +1,39 @@
+---
+# roles/rbac-multitenancy/defaults/main.yml
+# RBAC and multi-tenancy configuration
+
+rbac_enabled: true
+multitenancy_enabled: false  # Set to true for multi-tenant setups
+
+# Grafana RBAC
+grafana_rbac_enabled: true
+grafana_default_role: "Viewer"  # Viewer, Editor, Admin
+
+# Tenant organization setup
+tenants:
+  - name: "infrastructure"
+    display_name: "Infrastructure Team"
+    admin_users: []
+    editor_users: []
+    viewer_users: []
+    
+  - name: "applications"
+    display_name: "Applications Team"
+    admin_users: []
+    editor_users: []
+    viewer_users: []
+
+# Prometheus RBAC (remote write protection)
+prometheus_rbac_enabled: true
+prometheus_remote_write_auth_enabled: true
+
+# Loki multi-tenancy
+loki_multitenancy_enabled: false
+loki_auth_enabled: true
+
+# AlertManager RBAC
+alertmanager_rbac_enabled: true
+
+# Access control templates
+rbac_enforce_row_level_security: true
+rbac_enforce_dashboard_permissions: true

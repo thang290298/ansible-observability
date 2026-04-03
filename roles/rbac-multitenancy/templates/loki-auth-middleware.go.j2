@@ -1,0 +1,47 @@
+// Loki Authentication Middleware
+// Validates authorization headers and enforces tenant isolation
+
+package main
+
+import (
+    "fmt"
+    "strings"
+    "net/http"
+)
+
+// ValidateAuthorization checks Bearer token in Authorization header
+func ValidateAuthorization(r *http.Request) (string, error) {
+    authHeader := r.Header.Get("Authorization")
+    
+    if authHeader == "" {
+        return "", fmt.Errorf("missing Authorization header")
+    }
+    
+    // Expect: "Bearer <token>"
+    parts := strings.Split(authHeader, " ")
+    if len(parts) != 2 || parts[0] != "Bearer" {
+        return "", fmt.Errorf("invalid authorization format")
+    }
+    
+    token := parts[1]
+    
+    // TODO: Validate token against token store (vault, database, etc.)
+    // For now, just return the token
+    
+    return token, nil
+}
+
+// EnforceTenantIsolation ensures requests only access their own tenant data
+func EnforceTenantIsolation(w http.ResponseWriter, r *http.Request, tenant string) bool {
+    requestTenant := r.URL.Query().Get("tenant_id")
+    
+    if requestTenant != "" && requestTenant != tenant {
+        http.Error(w, "Forbidden: tenant isolation violation", http.StatusForbidden)
+        return false
+    }
+    
+    // Add tenant header for logging
+    r.Header.Set("X-Tenant-ID", tenant)
+    
+    return true
+}

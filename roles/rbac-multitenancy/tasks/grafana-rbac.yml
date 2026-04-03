@@ -1,0 +1,74 @@
+---
+# roles/rbac-multitenancy/tasks/grafana-rbac.yml
+# Grafana Role-Based Access Control setup
+
+- name: "[rbac-grafana] Create tenant organizations in Grafana"
+  block:
+    - name: "[rbac-grafana] Wait for Grafana to be ready"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ grafana_port }}/api/health"
+        status_code: 200
+      retries: 10
+      delay: 5
+      tags: [rbac, grafana]
+
+    - name: "[rbac-grafana] Get Grafana admin token"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ grafana_port }}/api/auth/login"
+        method: POST
+        body_format: json
+        body:
+          user: "{{ grafana_admin_user }}"
+          password: "{{ grafana_admin_password }}"
+      register: grafana_auth_response
+      tags: [rbac, grafana]
+
+    - name: "[rbac-grafana] Create organizations"
+      ansible.builtin.uri:
+        url: "http://localhost:{{ grafana_port }}/api/orgs"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ grafana_auth_response.json.accessToken }}"
+        body_format: json
+        body:
+          name: "{{ item.display_name }}"
+      register: org_creation
+      loop: "{{ tenants }}"
+      tags: [rbac, grafana]
+
+    - name: "[rbac-grafana] Store organization IDs"
+      ansible.builtin.set_fact:
+        grafana_orgs: "{{ grafana_orgs | default({}) | combine({item.item.name: item.json.orgId}) }}"
+      loop: "{{ org_creation.results }}"
+      when: item.json.orgId is defined
+      tags: [rbac, grafana]
+
+  tags: [rbac, grafana]
+
+- name: "[rbac-grafana] Generate RBAC policy rules"
+  ansible.builtin.template:
+    src: grafana-rbac-policies.yml.j2
+    dest: "{{ monitoring_base_dir }}/grafana/rbac-policies.yml"
+    mode: '0644'
+  tags: [rbac, grafana]
+
+- name: "[rbac-grafana] Create admin roles with permissions"
+  ansible.builtin.template:
+    src: grafana-admin-role.json.j2
+    dest: "{{ monitoring_base_dir }}/grafana/admin-role.json"
+    mode: '0644'
+  tags: [rbac, grafana]
+
+- name: "[rbac-grafana] Create editor roles with permissions"
+  ansible.builtin.template:
+    src: grafana-editor-role.json.j2
+    dest: "{{ monitoring_base_dir }}/grafana/editor-role.json"
+    mode: '0644'
+  tags: [rbac, grafana]
+
+- name: "[rbac-grafana] Create viewer roles with permissions"
+  ansible.builtin.template:
+    src: grafana-viewer-role.json.j2
+    dest: "{{ monitoring_base_dir }}/grafana/viewer-role.json"
+    mode: '0644'
+  tags: [rbac, grafana]

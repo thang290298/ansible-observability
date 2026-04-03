@@ -1,0 +1,29 @@
+# Loki Multi-Tenancy Isolation Rules
+# Enforce tenant boundaries and data isolation
+
+tenants:
+{% for tenant in tenants %}
+  - name: {{ tenant.name }}
+    display_name: {{ tenant.display_name }}
+    labels:
+      environment: {{ tenant.name }}
+    retention:
+      days: {{ log_retention_days | default(30) }}
+    rate_limits:
+      write_requests_per_second: 100
+      read_requests_per_second: 100
+{% endfor %}
+
+# Isolation rules
+isolation:
+  enforce_labels: true
+  forbidden_labels:
+    - "__private__"
+  required_labels:
+    - "tenant"
+
+# Rate limiting
+rate_limiting:
+  enabled: true
+  per_tenant:
+    enabled: true

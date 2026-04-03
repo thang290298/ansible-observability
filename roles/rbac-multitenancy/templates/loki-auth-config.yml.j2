@@ -1,0 +1,20 @@
+# Loki Authentication Configuration
+# API authentication and optional multi-tenancy
+
+auth:
+  enabled: true
+  default_tenant: "monitoring"
+  
+# Multi-tenancy support
+multitenancy:
+  enabled: {{ loki_multitenancy_enabled | default(false) | lower }}
+  
+# Token validation
+tokens:
+  # Check bearer tokens in Authorization header
+  bearer_token_check: true
+  
+# Tenant isolation
+tenant_isolation:
+  enabled: {{ loki_multitenancy_enabled | default(false) | lower }}
+  enforce_tenant_labels: true

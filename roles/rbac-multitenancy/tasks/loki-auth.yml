@@ -1,0 +1,26 @@
+---
+# roles/rbac-multitenancy/tasks/loki-auth.yml
+# Loki authentication and optional multi-tenancy setup
+
+- name: "[rbac-loki] Generate Loki auth configuration"
+  ansible.builtin.template:
+    src: loki-auth-config.yml.j2
+    dest: "{{ monitoring_base_dir }}/loki/auth-config.yml"
+    mode: '0644'
+  notify: Restart loki
+  tags: [rbac, loki]
+
+- name: "[rbac-loki] Create Loki API auth middleware"
+  ansible.builtin.template:
+    src: loki-auth-middleware.go.j2
+    dest: "{{ monitoring_base_dir }}/loki/auth-middleware.go"
+    mode: '0644'
+  tags: [rbac, loki]
+
+- name: "[rbac-loki] Generate tenant isolation rules"
+  ansible.builtin.template:
+    src: loki-tenant-isolation.yml.j2
+    dest: "{{ monitoring_base_dir }}/loki/tenant-isolation.yml"
+    mode: '0644'
+  when: loki_multitenancy_enabled | default(false)
+  tags: [rbac, loki, multitenancy]

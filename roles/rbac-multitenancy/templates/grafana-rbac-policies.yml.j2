@@ -1,0 +1,27 @@
+# Grafana RBAC Policy Rules
+# Defines permissions for built-in roles
+
+admin:
+  permissions:
+    - action: "dashboards:create"
+    - action: "dashboards:write"
+    - action: "dashboards:delete"
+    - action: "datasources:create"
+    - action: "datasources:write"
+    - action: "datasources:delete"
+    - action: "org:read"
+    - action: "org:write"
+    - action: "users:read"
+    - action: "users:write"
+
+editor:
+  permissions:
+    - action: "dashboards:create"
+    - action: "dashboards:write"
+    - action: "dashboards:read"
+    - action: "datasources:query"
+
+viewer:
+  permissions:
+    - action: "dashboards:read"
+    - action: "datasources:query"

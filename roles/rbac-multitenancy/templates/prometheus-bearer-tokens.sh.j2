@@ -1,0 +1,29 @@
+#!/bin/bash
+# Generate bearer tokens for Prometheus remote write
+# Creates random tokens for each component
+
+TOKENS_FILE="{{ monitoring_base_dir }}/prometheus/bearer-tokens.txt"
+
+echo "Generating bearer tokens for Prometheus..."
+echo
+
+# Generate vmagent write token
+VMAGENT_TOKEN=$(openssl rand -hex 32)
+echo "VMAGENT_WRITE_TOKEN: $VMAGENT_TOKEN"
+
+# Generate Prometheus query token
+PROMETHEUS_QUERY_TOKEN=$(openssl rand -hex 32)
+echo "PROMETHEUS_QUERY_TOKEN: $PROMETHEUS_QUERY_TOKEN"
+
+# Store in file (restricted permissions)
+cat > "$TOKENS_FILE" <<EOF
+# Prometheus Bearer Tokens
+# KEEP THIS FILE SECURE - DO NOT COMMIT TO GIT
+
+VMAGENT_WRITE_TOKEN=$VMAGENT_TOKEN
+PROMETHEUS_QUERY_TOKEN=$PROMETHEUS_QUERY_TOKEN
+EOF
+
+chmod 600 "$TOKENS_FILE"
+echo
+echo "Tokens saved to: $TOKENS_FILE"

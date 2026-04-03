@@ -1,0 +1,33 @@
+# AlertManager Access Control Templates
+# Define user and group mappings for RBAC
+
+users:
+  admin:
+    groups:
+      - alertmanager-admins
+    email: "admin@example.com"
+    
+  operator:
+    groups:
+      - alertmanager-operators
+    email: "operator@example.com"
+    
+  viewer:
+    groups: []
+    email: "viewer@example.com"
+
+# Team-based access control
+teams:
+  infrastructure:
+    description: "Infrastructure team"
+    members: []
+    permissions:
+      - "alerts:read"
+      - "silences:create"
+      
+  applications:
+    description: "Applications team"
+    members: []
+    permissions:
+      - "alerts:read"
+      - "silences:read"

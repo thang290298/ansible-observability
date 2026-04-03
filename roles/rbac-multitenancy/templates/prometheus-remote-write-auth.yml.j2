@@ -1,0 +1,24 @@
+# Prometheus Remote Write Authentication Configuration
+# Bearer token validation for remote write endpoints
+
+global:
+  remote_write_auth_enabled: true
+  auth_header_name: "Authorization"
+  auth_scheme: "Bearer"
+
+endpoints:
+  - path: "/api/v1/write"
+    auth_required: true
+    allowed_tenants: ["*"]
+    
+  - path: "/api/v1/query"
+    auth_required: false  # Read can be public
+    
+  - path: "/api/v1/admin/*"
+    auth_required: true
+    allowed_users: ["admin"]
+
+tokens:
+  # Generated tokens stored in vault
+  vmagent_write_token: "{{ vault_vmagent_write_token | default('CHANGE_ME') }}"
+  prometheus_query_token: "{{ vault_prometheus_query_token | default('CHANGE_ME') }}"

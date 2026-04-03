@@ -1,0 +1,18 @@
+---
+# roles/rbac-multitenancy/tasks/alertmanager-rbac.yml
+# AlertManager RBAC and access control
+
+- name: "[rbac-alertmanager] Generate AlertManager auth configuration"
+  ansible.builtin.template:
+    src: alertmanager-rbac-config.yml.j2
+    dest: "{{ monitoring_base_dir }}/alertmanager/rbac-config.yml"
+    mode: '0644'
+  notify: Restart alertmanager
+  tags: [rbac, alertmanager]
+
+- name: "[rbac-alertmanager] Create access control templates"
+  ansible.builtin.template:
+    src: alertmanager-access-control.yml.j2
+    dest: "{{ monitoring_base_dir }}/alertmanager/access-control.yml"
+    mode: '0644'
+  tags: [rbac, alertmanager]

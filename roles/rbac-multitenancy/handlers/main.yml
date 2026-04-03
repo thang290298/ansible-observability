@@ -1,0 +1,25 @@
+---
+# roles/rbac-multitenancy/handlers/main.yml
+# Handlers for RBAC configuration changes
+
+- name: Reload Prometheus config
+  ansible.builtin.uri:
+    url: "http://localhost:{{ prometheus_port | default(9090) }}/-/reload"
+    method: POST
+    status_code: [200, 204]
+  ignore_errors: true
+  listen: "Reload Prometheus config"
+
+- name: Restart loki
+  community.docker.docker_container:
+    name: loki
+    state: restarted
+  ignore_errors: true
+  listen: "Restart loki"
+
+- name: Restart alertmanager
+  community.docker.docker_container:
+    name: alertmanager
+    state: restarted
+  ignore_errors: true
+  listen: "Restart alertmanager"

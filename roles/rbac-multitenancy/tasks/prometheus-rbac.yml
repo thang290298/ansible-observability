@@ -1,0 +1,25 @@
+---
+# roles/rbac-multitenancy/tasks/prometheus-rbac.yml
+# Prometheus remote write authentication and RBAC
+
+- name: "[rbac-prometheus] Generate remote write auth configuration"
+  ansible.builtin.template:
+    src: prometheus-remote-write-auth.yml.j2
+    dest: "{{ monitoring_base_dir }}/prometheus/remote-write-auth.yml"
+    mode: '0600'
+  notify: Reload Prometheus config
+  tags: [rbac, prometheus]
+
+- name: "[rbac-prometheus] Create bearer token for remote write"
+  ansible.builtin.template:
+    src: prometheus-bearer-tokens.sh.j2
+    dest: "{{ monitoring_base_dir }}/prometheus/generate-tokens.sh"
+    mode: '0755'
+  tags: [rbac, prometheus]
+
+- name: "[rbac-prometheus] Generate authentication middleware config"
+  ansible.builtin.template:
+    src: prometheus-auth-proxy.yml.j2
+    dest: "{{ monitoring_base_dir }}/prometheus/auth-proxy.yml"
+    mode: '0644'
+  tags: [rbac, prometheus]

@@ -1,0 +1,35 @@
+---
+# roles/rbac-multitenancy/tasks/main.yml
+# Setup RBAC and multi-tenancy across monitoring stack
+
+- name: "[rbac] Setup Grafana RBAC"
+  ansible.builtin.include_tasks: grafana-rbac.yml
+  when: grafana_rbac_enabled | default(true)
+  tags: [rbac, grafana]
+
+- name: "[rbac] Setup Prometheus remote write authentication"
+  ansible.builtin.include_tasks: prometheus-rbac.yml
+  when: prometheus_rbac_enabled | default(true)
+  tags: [rbac, prometheus]
+
+- name: "[rbac] Setup Loki authentication"
+  ansible.builtin.include_tasks: loki-auth.yml
+  when: loki_auth_enabled | default(true)
+  tags: [rbac, loki]
+
+- name: "[rbac] Setup AlertManager RBAC"
+  ansible.builtin.include_tasks: alertmanager-rbac.yml
+  when: alertmanager_rbac_enabled | default(true)
+  tags: [rbac, alertmanager]
+
+- name: "[rbac] Display RBAC configuration summary"
+  ansible.builtin.debug:
+    msg:
+      - "✓ RBAC Configuration Complete"
+      - "  Grafana RBAC: {{ grafana_rbac_enabled }}"
+      - "  Prometheus auth: {{ prometheus_rbac_enabled }}"
+      - "  Loki auth: {{ loki_auth_enabled }}"
+      - "  AlertManager RBAC: {{ alertmanager_rbac_enabled }}"
+      - "  Multi-tenancy enabled: {{ multitenancy_enabled }}"
+      - "  Tenants configured: {{ tenants | length }}"
+  tags: [rbac, summary]

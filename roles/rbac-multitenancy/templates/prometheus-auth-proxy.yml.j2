@@ -1,0 +1,39 @@
+# Prometheus Authentication Proxy Configuration
+# Reverse proxy to protect Prometheus with auth layer
+
+upstream prometheus_backend {
+    server {{ prometheus_host | default('localhost') }}:{{ prometheus_port | default(9090) }};
+}
+
+server {
+    listen 9091;
+    server_name _;
+    
+    client_max_body_size 100m;
+    
+    # Require bearer token for all requests
+    location / {
+        # Check authorization header
+        if ($http_authorization = "") {
+            return 401 "Authorization required";
+        }
+        
+        # Validate token format
+        if ($http_authorization !~ "^Bearer [a-z0-9]+$") {
+            return 403 "Invalid authorization format";
+        }
+        
+        # Forward to Prometheus
+        proxy_pass http://prometheus_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Authorization $http_authorization;
+    }
+    
+    # Health check endpoint (no auth required)
+    location /health {
+        proxy_pass http://prometheus_backend;
+        access_log off;
+    }
+}
